@@ -21,6 +21,24 @@ func assertAllowlistMatch(t *testing.T, allowlist *Allowlist, method string, raw
 	}
 }
 
+func TestAllowlistSchemeMatch(t *testing.T) {
+	allowlist := &Allowlist{
+		AllowlistItem{
+			URL:            "https://foo.com/https-only",
+			AllowedMethods: []string{"GET"},
+		},
+		AllowlistItem{
+			URL:            "http://foo.com/http-only",
+			AllowedMethods: []string{"GET"},
+		},
+	}
+
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/https-only", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/http-only", false)
+	assertAllowlistMatch(t, allowlist, "GET", "http://foo.com/https-only", false)
+	assertAllowlistMatch(t, allowlist, "GET", "http://foo.com/http-only", true)
+}
+
 func TestAllowlistMethodMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
