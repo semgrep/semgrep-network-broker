@@ -23,7 +23,7 @@ func (config AllowlistItem) Matches(method string, url *url.URL) bool {
 
 	parsedUrl, _ := url.Parse(config.URL)
 
-	if parsedUrl.Host != url.Host {
+	if parsedUrl.Scheme != url.Scheme || parsedUrl.Host != url.Host {
 		return false
 	}
 
