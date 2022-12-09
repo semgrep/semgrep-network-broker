@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"gopkg.in/dealancer/validate.v2"
 )
 
 var configFiles []string
@@ -48,13 +47,6 @@ var rootCmd = &cobra.Command{
 		if err := viper.Unmarshal(config); err != nil {
 			log.Panic(fmt.Errorf("failed to unmarshal config: %v", err))
 		}
-		if err := validate.Validate(config); err != nil {
-			log.Panic(fmt.Errorf("invalid config: %v", err))
-		}
-
-		if !config.Inbound.Enabled && !config.Outbound.Enabled {
-			panic("neither inbound nor outbound proxies are enabled")
-		}
 
 		if config.Debug {
 			log.SetLevel(log.DebugLevel)
@@ -64,7 +56,7 @@ var rootCmd = &cobra.Command{
 		if config.Inbound.Enabled {
 			teardown, err := config.Inbound.Start(config.Debug)
 			if err != nil {
-				log.Panic(err)
+				log.Panic(fmt.Errorf("failed to start inbound proxy: %v", err))
 			}
 			defer teardown()
 			config.Inbound.Wireguard.PrintInfo()
@@ -72,7 +64,9 @@ var rootCmd = &cobra.Command{
 
 		// outbound (customer --> r2c) proxy
 		if config.Outbound.Enabled {
-			config.Outbound.Start()
+			if err := config.Outbound.Start(); err != nil {
+				log.Panic(fmt.Errorf("failed to start outbound proxy: %v", err))
+			}
 			log.Infof("Semgrep API proxy to %s listening on %s", config.Outbound.BaseUrl, config.Outbound.Listen)
 		}
 
