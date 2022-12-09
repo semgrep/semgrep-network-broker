@@ -48,6 +48,11 @@ var rootCmd = &cobra.Command{
 			log.Panic(fmt.Errorf("failed to unmarshal config: %v", err))
 		}
 
+		// bail early if nothing is enabled
+		if !config.Inbound.Enabled && !config.Outbound.Enabled {
+			log.Panic("neither inbound nor outbound proxies enabled")
+		}
+
 		if config.Debug {
 			log.SetLevel(log.DebugLevel)
 		}
