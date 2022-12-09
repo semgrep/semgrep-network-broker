@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
+	"gopkg.in/dealancer/validate.v2"
 )
 
 const errorResponseHeader = "X-Semgrep-Private-Link-Error"
@@ -17,6 +18,11 @@ const proxyResponseHeader = "X-Semgrep-Private-Link"
 const wireguardHttpPort = 80
 
 func (config *InboundProxyConfig) Start(verbose bool) (func() error, error) {
+	// ensure config is valid
+	if err := validate.Validate(config); err != nil {
+		return nil, fmt.Errorf("invalid inbound config: %v", err)
+	}
+
 	// setup wireguard
 	dev, tnet, err := SetupWireguard(&config.Wireguard, verbose)
 	if err != nil {

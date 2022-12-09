@@ -1,14 +1,21 @@
 package pkg
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/dealancer/validate.v2"
 )
 
-func (config *OutboundProxyConfig) Start() {
+func (config *OutboundProxyConfig) Start() error {
+	// ensure config is valid
+	if err := validate.Validate(config); err != nil {
+		return fmt.Errorf("invalid outbound config: %v", err)
+	}
+
 	go func() {
 		baseUrl, err := url.Parse(config.BaseUrl)
 		if err != nil {
@@ -30,4 +37,5 @@ func (config *OutboundProxyConfig) Start() {
 
 		http.ListenAndServe(config.Listen, proxy)
 	}()
+	return nil
 }
