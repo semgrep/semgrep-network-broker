@@ -104,11 +104,7 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 		}
 	}()
 
-	heartbeatTeardown, err := config.Heartbeat.Start(tnet.DialContext)
-	if err != nil {
-		dev.Down()
-		return nil, err
-	}
+	heartbeatTeardown := config.Heartbeat.Start(tnet.DialContext)
 
 	return func() error {
 		heartbeatTeardown()

@@ -160,6 +160,9 @@ func TestWireguardInboundProxy(t *testing.T) {
 				Methods: pkg.HttpMethodsToBitSet([]string{"POST"}),
 			},
 		},
+		Heartbeat: pkg.HeartbeatConfig{
+			URL: fmt.Sprintf("http://[%v]/ping", gatewayWireguardAddress),
+		},
 	}
 	defaults.SetDefaults(inboundConfig)
 
