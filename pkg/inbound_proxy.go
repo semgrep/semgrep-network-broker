@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -46,7 +45,7 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-		SkipPaths: []string{healthcheckPath},
+		SkipPaths: config.Logging.SkipPaths,
 	}), gin.Recovery())
 
 	// setup healthcheck
@@ -105,27 +104,10 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 		}
 	}()
 
-	if config.HealthcheckUrl != "" {
-		client := http.Client{
-			Transport: &http.Transport{
-				DialContext: tnet.DialContext,
-			},
-			Timeout: time.Second * 5,
-		}
+	heartbeatTeardown := config.Heartbeat.Start(tnet.DialContext)
 
-		resp, err := client.Get(config.HealthcheckUrl)
-		if err != nil {
-			dev.Down()
-			return nil, err
-		}
-
-		if resp.StatusCode != 200 {
-			dev.Down()
-			return nil, fmt.Errorf("healthcheck failed: HTTP %v from %v", resp.StatusCode, config.HealthcheckUrl)
-		}
-
-		log.Infof("Established connectivity with r2c")
-	}
-
-	return dev.Down, nil
+	return func() error {
+		heartbeatTeardown()
+		return dev.Down()
+	}, nil
 }

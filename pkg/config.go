@@ -127,11 +127,23 @@ type AllowlistItem struct {
 
 type Allowlist []AllowlistItem
 
+type LoggingConfig struct {
+	SkipPaths []string `mapstructure:"skipPaths"`
+}
+
+type HeartbeatConfig struct {
+	URL                    string `mapstructure:"url" validate:"format=url"`
+	IntervalSeconds        int    `mapstructure:"intervalSeconds" validate:"gte=30" default:"60"`
+	TimeoutSeconds         int    `mapstructure:"timeoutSeconds" validate:"gt=0" default:"5"`
+	PanicAfterFailureCount int    `mapstructure:"panicAfterFailureCount" validate:"gte=0"`
+}
+
 type InboundProxyConfig struct {
-	Wireguard       WireguardBase `mapstructure:"wireguard"`
-	Allowlist       Allowlist     `mapstructure:"allowlist"`
-	ProxyListenPort int           `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
-	HealthcheckUrl  string        `mapstructure:"healthcheckUrl" validate:"empty=true | format=url"`
+	Wireguard       WireguardBase   `mapstructure:"wireguard"`
+	Allowlist       Allowlist       `mapstructure:"allowlist"`
+	ProxyListenPort int             `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
+	Logging         LoggingConfig   `mapstructure:"logging"`
+	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat"`
 }
 
 type Config struct {
