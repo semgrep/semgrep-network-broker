@@ -2,7 +2,6 @@ package it
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -13,8 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mcuadros/go-defaults"
 	"github.com/returntocorp/semgrep-network-broker/pkg"
 
+	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -92,20 +93,23 @@ func TestWireguardInboundProxy(t *testing.T) {
 	clientPrivateKey, _ := wgtypes.GeneratePrivateKey()
 	clientPublicKey := clientPrivateKey.PublicKey()
 	clientWireguardAddress := mustGetRandomPrivateAddress()
+	log.Info("prior to everything")
 
 	// setup wireguard
-	testWireguard := pkg.WireguardBase{
+	testWireguard := &pkg.WireguardBase{
 		LocalAddress: gatewayWireguardAddress.String(),
-		PrivateKey:   hex.EncodeToString(gatewayPrivateKey[:]),
+		PrivateKey:   gatewayPrivateKey[:],
 		Peers: []pkg.WireguardPeer{
 			{
-				PublicKey:  hex.EncodeToString(clientPublicKey[:]),
-				AllowedIps: fmt.Sprintf("%v/128", clientWireguardAddress),
+				PublicKey:                  clientPublicKey[:],
+				AllowedIps:                 fmt.Sprintf("%v/128", clientWireguardAddress),
+				DisablePersistentKeepalive: true,
 			},
 		},
 		ListenPort: gatewayWireguardPort,
 	}
-	testDev, testNet, err := pkg.SetupWireguard(&testWireguard, false)
+	defaults.SetDefaults(testWireguard)
+	testDev, testNet, err := pkg.SetupWireguard(testWireguard)
 	if err != nil {
 		t.Errorf("failed to setup wireguard: %v", err)
 	}
@@ -113,6 +117,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 	if err := testDev.Up(); err != nil {
 		t.Errorf("failed to bring up wireguard device: %v", err)
 	}
+	log.Info("Remote wireguard is up")
 
 	defer testDev.Down()
 
@@ -129,40 +134,42 @@ func TestWireguardInboundProxy(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello")
 	}))
-
 	defer server.Close()
+	log.Info("Test server is up")
 
 	// start network broker
 	inboundConfig := &pkg.InboundProxyConfig{
 		Wireguard: pkg.WireguardBase{
 			LocalAddress: clientWireguardAddress.String(),
-			PrivateKey:   hex.EncodeToString(clientPrivateKey[:]),
+			PrivateKey:   clientPrivateKey[:],
 			Peers: []pkg.WireguardPeer{
 				{
-					PublicKey:                   hex.EncodeToString(gatewayPublicKey[:]),
-					AllowedIps:                  fmt.Sprintf("%v/128", gatewayWireguardAddress),
-					Endpoint:                    fmt.Sprintf("127.0.0.1:%v", gatewayWireguardPort),
-					PersistentKeepaliveInterval: 20,
+					PublicKey:  gatewayPublicKey[:],
+					AllowedIps: fmt.Sprintf("%v/128", gatewayWireguardAddress),
+					Endpoint:   fmt.Sprintf("127.0.0.1:%v", gatewayWireguardPort),
 				},
 			},
 		},
 		Allowlist: []pkg.AllowlistItem{
 			{
-				URL:            server.URL + "/allowed-get",
-				AllowedMethods: []string{"GET"},
+				URL:     server.URL + "/allowed-get",
+				Methods: pkg.HttpMethodsToBitSet([]string{"GET"}),
 			},
 			{
-				URL:            server.URL + "/allowed-post",
-				AllowedMethods: []string{"POST"},
+				URL:     server.URL + "/allowed-post",
+				Methods: pkg.HttpMethodsToBitSet([]string{"POST"}),
 			},
 		},
 	}
+	defaults.SetDefaults(inboundConfig)
 
-	inboundTeardown, err := inboundConfig.Start(false)
+	inboundTeardown, err := inboundConfig.Start()
 	if err != nil {
 		t.Error(err)
+		t.FailNow()
 	}
 	defer inboundTeardown()
+	log.Info("Test broker is up")
 
 	// it should proxy requests that match the allowlist
 	tc.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, server.URL), 200)

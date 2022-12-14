@@ -12,7 +12,6 @@ import (
 	"github.com/returntocorp/semgrep-network-broker/pkg"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var configFiles []string
@@ -36,45 +35,21 @@ var rootCmd = &cobra.Command{
 			done <- true
 		}()
 
-		// load and validate configs
-		config := &pkg.Config{Outbound: pkg.OutboundProxyConfig{Enabled: true, Listen: ":8080", BaseUrl: "https://semgrep.dev/"}, Inbound: pkg.InboundProxyConfig{Metrics: true}}
-		for i := range configFiles {
-			viper.SetConfigFile(configFiles[i])
-			if err := viper.MergeInConfig(); err != nil {
-				log.Panic(fmt.Errorf("failed to read config: %v", err))
-			}
-		}
-		if err := viper.Unmarshal(config); err != nil {
-			log.Panic(fmt.Errorf("failed to unmarshal config: %v", err))
+		// load config(s)
+		config, err := pkg.LoadConfig(configFiles)
+		if err != nil {
+			log.Panic(err)
 		}
 
-		// bail early if nothing is enabled
-		if !config.Inbound.Enabled && !config.Outbound.Enabled {
-			log.Panic("neither inbound nor outbound proxies enabled")
+		// start inbound proxy (r2c --> customer)
+		teardown, err := config.Inbound.Start()
+		if err != nil {
+			log.Panic(fmt.Errorf("failed to start inbound proxy: %v", err))
 		}
+		defer teardown()
+		config.Inbound.Wireguard.PrintInfo()
 
-		if config.Debug {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		// inbound (r2c --> customer) proxy
-		if config.Inbound.Enabled {
-			teardown, err := config.Inbound.Start(config.Debug)
-			if err != nil {
-				log.Panic(fmt.Errorf("failed to start inbound proxy: %v", err))
-			}
-			defer teardown()
-			config.Inbound.Wireguard.PrintInfo()
-		}
-
-		// outbound (customer --> r2c) proxy
-		if config.Outbound.Enabled {
-			if err := config.Outbound.Start(); err != nil {
-				log.Panic(fmt.Errorf("failed to start outbound proxy: %v", err))
-			}
-			log.Infof("Semgrep API proxy to %s listening on %s", config.Outbound.BaseUrl, config.Outbound.Listen)
-		}
-
+		// wait for termination
 		<-done
 	},
 }

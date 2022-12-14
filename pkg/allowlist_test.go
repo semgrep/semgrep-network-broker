@@ -24,12 +24,12 @@ func assertAllowlistMatch(t *testing.T, allowlist *Allowlist, method string, raw
 func TestAllowlistSchemeMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
-			URL:            "https://foo.com/https-only",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/https-only",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 		AllowlistItem{
-			URL:            "http://foo.com/http-only",
-			AllowedMethods: []string{"GET"},
+			URL:     "http://foo.com/http-only",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 	}
 
@@ -42,16 +42,16 @@ func TestAllowlistSchemeMatch(t *testing.T) {
 func TestAllowlistMethodMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
-			URL:            "https://foo.com/get-only",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/get-only",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 		AllowlistItem{
-			URL:            "https://foo.com/post-only",
-			AllowedMethods: []string{"POST"},
+			URL:     "https://foo.com/post-only",
+			Methods: HttpMethodsToBitSet([]string{"POST"}),
 		},
 		AllowlistItem{
-			URL:            "https://foo.com/get-or-post",
-			AllowedMethods: []string{"GET", "POST"},
+			URL:     "https://foo.com/get-or-post",
+			Methods: HttpMethodsToBitSet([]string{"GET", "POST"}),
 		},
 	}
 
@@ -71,12 +71,12 @@ func TestAllowlistMethodMatch(t *testing.T) {
 func TestAllowlistDomainMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
-			URL:            "https://foo.com/*",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/*",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 		AllowlistItem{
-			URL:            "https://bar.com/*",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://bar.com/*",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 	}
 
@@ -88,16 +88,16 @@ func TestAllowlistDomainMatch(t *testing.T) {
 func TestAllowlistPathMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
-			URL:            "https://foo.com/hardcoded-path",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/hardcoded-path",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 		AllowlistItem{
-			URL:            "https://foo.com/wildcard-path/*",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/wildcard-path/*",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 		AllowlistItem{
-			URL:            "https://foo.com/variable-path/:variable",
-			AllowedMethods: []string{"GET"},
+			URL:     "https://foo.com/variable-path/:variable",
+			Methods: HttpMethodsToBitSet([]string{"GET"}),
 		},
 	}
 
