@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -33,6 +34,12 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 
 	if err := dev.Up(); err != nil {
 		return nil, fmt.Errorf("failed to bring up wireguard device: %v", err)
+	}
+
+	log.Info("Wireguard interface is UP:")
+	log.Infof("  Local Address: %v", config.Wireguard.LocalAddress)
+	for i := range config.Wireguard.Peers {
+		log.Infof("  Peer: %+v", config.Wireguard.Peers[i])
 	}
 
 	// setup http server
@@ -97,5 +104,28 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 			log.Panic(fmt.Errorf("failed to start http server: %v", err))
 		}
 	}()
+
+	if config.HealthcheckUrl != "" {
+		client := http.Client{
+			Transport: &http.Transport{
+				DialContext: tnet.DialContext,
+			},
+			Timeout: time.Second * 5,
+		}
+
+		resp, err := client.Get(config.HealthcheckUrl)
+		if err != nil {
+			dev.Down()
+			return nil, err
+		}
+
+		if resp.StatusCode != 200 {
+			dev.Down()
+			return nil, fmt.Errorf("healthcheck failed: HTTP %v from %v", resp.StatusCode, config.HealthcheckUrl)
+		}
+
+		log.Infof("Established connectivity with r2c")
+	}
+
 	return dev.Down, nil
 }

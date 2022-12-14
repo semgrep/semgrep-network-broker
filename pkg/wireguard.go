@@ -12,8 +12,6 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
-
-	log "github.com/sirupsen/logrus"
 )
 
 func (peer WireguardPeer) Validate() error {
@@ -104,13 +102,4 @@ func SetupWireguard(base *WireguardBase) (*device.Device, *netstack.Net, error) 
 	}
 
 	return dev, tnet, nil
-}
-
-func (config *WireguardBase) PrintInfo() {
-	log.Info("Wireguard interface is UP:")
-	log.Infof("  Local Address: %v", config.LocalAddress)
-	log.Infof("  DNS: %v", config.Dns)
-	for i := range config.Peers {
-		log.Infof("  Peer: %+v", config.Peers[i])
-	}
 }
