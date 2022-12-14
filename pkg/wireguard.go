@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand"
@@ -24,22 +25,20 @@ func (peer WireguardPeer) Validate() error {
 }
 
 func (peer WireguardPeer) WriteTo(sb io.StringWriter) {
-	sb.WriteString(fmt.Sprintf("public_key=%s\n", peer.PublicKey))
+	sb.WriteString(fmt.Sprintf("public_key=%s\n", hex.EncodeToString(peer.PublicKey)))
 	if peer.Endpoint != "" {
 		sb.WriteString(fmt.Sprintf("endpoint=%s\n", peer.resolvedEndpoint))
 	}
 	sb.WriteString(fmt.Sprintf("allowed_ip=%s\n", peer.AllowedIps))
-	if peer.PersistentKeepaliveInterval > 0 {
+	if !peer.DisablePersistentKeepalive {
 		sb.WriteString(fmt.Sprintf("persistent_keepalive_interval=%d\n", peer.PersistentKeepaliveInterval))
 	}
 }
 
-const DefaultMtu = 1420
-
 func (base WireguardBase) String() string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("private_key=%s\n", base.PrivateKey))
+	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(base.PrivateKey)))
 	sb.WriteString(fmt.Sprintf("listen_port=%d\n", base.ListenPort))
 
 	for i := range base.Peers {
@@ -73,7 +72,7 @@ func (base *WireguardBase) ResolvePeerEndpoints() error {
 	return nil
 }
 
-func SetupWireguard(base *WireguardBase, verbose bool) (*device.Device, *netstack.Net, error) {
+func SetupWireguard(base *WireguardBase) (*device.Device, *netstack.Net, error) {
 	if err := base.ResolvePeerEndpoints(); err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve peer endpoint: %v", err)
 	}
@@ -85,22 +84,17 @@ func SetupWireguard(base *WireguardBase, verbose bool) (*device.Device, *netstac
 		dnsAddresses[i] = netip.MustParseAddr(base.Dns[i])
 	}
 
-	mtu := base.Mtu
-	if mtu == 0 {
-		mtu = DefaultMtu
-	}
-
 	tun, tnet, err := netstack.CreateNetTUN(
 		[]netip.Addr{localAddress},
 		dnsAddresses,
-		mtu,
+		base.Mtu,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create tun: %v", err)
 	}
 
 	level := device.LogLevelError
-	if verbose {
+	if base.Verbose {
 		level = device.LogLevelVerbose
 	}
 	dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(level, ""))

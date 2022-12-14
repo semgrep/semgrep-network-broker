@@ -15,16 +15,18 @@ import (
 
 const errorResponseHeader = "X-Semgrep-Private-Link-Error"
 const proxyResponseHeader = "X-Semgrep-Private-Link"
-const wireguardHttpPort = 80
+const healthcheckPath = "/healthcheck"
+const destinationUrlParam = "destinationUrl"
+const proxyPath = "/proxy/*" + destinationUrlParam
 
-func (config *InboundProxyConfig) Start(verbose bool) (func() error, error) {
+func (config *InboundProxyConfig) Start() (func() error, error) {
 	// ensure config is valid
 	if err := validate.Validate(config); err != nil {
 		return nil, fmt.Errorf("invalid inbound config: %v", err)
 	}
 
 	// setup wireguard
-	dev, tnet, err := SetupWireguard(&config.Wireguard, verbose)
+	dev, tnet, err := SetupWireguard(&config.Wireguard)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup wireguard: %v", err)
 	}
@@ -35,18 +37,21 @@ func (config *InboundProxyConfig) Start(verbose bool) (func() error, error) {
 
 	// setup http server
 	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		SkipPaths: []string{healthcheckPath},
+	}), gin.Recovery())
 
-	if config.Metrics {
-		p := ginprometheus.NewPrometheus("gin")
-		p.Use(r)
-	}
+	// setup healthcheck
+	r.GET(healthcheckPath, func(c *gin.Context) { c.JSON(http.StatusOK, "OK") })
 
-	r.GET("/healthcheck", func(c *gin.Context) { c.JSON(http.StatusOK, "OK") })
+	// setup metrics
+	p := ginprometheus.NewPrometheus("gin")
+	p.Use(r)
 
 	// setup http proxy
-	r.Any("/proxy/*destinationUrl", func(c *gin.Context) {
-		destinationUrl, err := url.Parse(c.Param("destinationUrl")[1:])
+	r.Any(proxyPath, func(c *gin.Context) {
+		destinationUrl, err := url.Parse(c.Param(destinationUrlParam)[1:])
 		if err != nil {
 			c.Header(errorResponseHeader, "1")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -82,12 +87,12 @@ func (config *InboundProxyConfig) Start(verbose bool) (func() error, error) {
 
 	// its showtime!
 	go func() {
-		wireguardListener, err := tnet.ListenTCP(&net.TCPAddr{Port: wireguardHttpPort})
+		wireguardListener, err := tnet.ListenTCP(&net.TCPAddr{Port: config.ProxyListenPort})
 		if err != nil {
 			log.Panic(fmt.Errorf("failed to start TCP listener: %v", err))
 		}
 
-		err = http.Serve(wireguardListener, r.Handler())
+		err = r.RunListener(wireguardListener)
 		if err != nil {
 			log.Panic(fmt.Errorf("failed to start http server: %v", err))
 		}

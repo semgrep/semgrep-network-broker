@@ -2,22 +2,13 @@ package pkg
 
 import (
 	"net/url"
-	"strings"
 
 	"github.com/ucarion/urlpath"
 )
 
-func stringInSlice(needle string, haystack []string) bool {
-	for i := range haystack {
-		if strings.EqualFold(needle, haystack[i]) {
-			return true
-		}
-	}
-	return false
-}
-
 func (config AllowlistItem) Matches(method string, url *url.URL) bool {
-	if !stringInSlice(method, config.AllowedMethods) {
+	m := LookupHttpMethod(method)
+	if m == MethodUnknown || !config.Methods.Test(m) {
 		return false
 	}
 
