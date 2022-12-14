@@ -131,6 +131,7 @@ type InboundProxyConfig struct {
 	Wireguard       WireguardBase `mapstructure:"wireguard"`
 	Allowlist       Allowlist     `mapstructure:"allowlist"`
 	ProxyListenPort int           `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
+	HealthcheckUrl  string        `mapstructure:"healthcheckUrl" validate:"empty=true | format=url"`
 }
 
 type Config struct {

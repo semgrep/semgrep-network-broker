@@ -47,7 +47,6 @@ var rootCmd = &cobra.Command{
 			log.Panic(fmt.Errorf("failed to start inbound proxy: %v", err))
 		}
 		defer teardown()
-		config.Inbound.Wireguard.PrintInfo()
 
 		// wait for termination
 		<-done
