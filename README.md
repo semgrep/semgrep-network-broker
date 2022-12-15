@@ -71,7 +71,7 @@ The broker can be run in Kubernetes, as a bare Docker container, or simply as a 
 Config file(s) are passed to the app with `-c`:
 
 ```bash
-semgrep-native-broker -c config.yaml
+semgrep-network-broker -c config.yaml
 ```
 
 Requirements:
