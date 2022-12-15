@@ -75,4 +75,4 @@ semgrep-native-broker -c config.yaml
 ```
 
 Requirements:
-- internet access to `wireguard.semgrep.dev` on UDP port 51280
+- internet access to `wireguard.TENANT.semgrep.dev` on UDP port 51820 (replace TENANT with your tenant name)
