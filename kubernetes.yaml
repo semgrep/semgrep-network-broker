@@ -14,7 +14,7 @@ data:
           endpoint: example.com:51820
           allowedIps: 192.168.0.1/32
       heartbeat:
-        url: http://[fdf0:59dc:33cf:9be9:0000:0000:0000:0001]/ping
+        url: http://192.168.0.1/ping
       allowlist:
         - url: http://example.com/*
           methods:
