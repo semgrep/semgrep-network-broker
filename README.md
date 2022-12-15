@@ -59,6 +59,7 @@ inbound:
       methods: [GET, POST]
     # allow GET requests from a URL that looks like a GitHub Enterprise review comments URL, and add a bearer token to the request
     - url: http://example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
+      methods: [GET]
       setRequestHeaders:
         Authorization: "Bearer ...snip..."
 
