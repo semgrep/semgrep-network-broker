@@ -3,10 +3,13 @@ BINARY_NAME=semgrep-network-broker
 deps:
 	go mod download
 
-build:
+build: deps
 	go build -o bin/${BINARY_NAME} main.go
 
-test:
+docker:
+	docker build -t semgrep-network-broker .
+
+test: build
 	go test -v ./...
 
 clean:
