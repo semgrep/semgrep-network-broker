@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bits-and-blooms/bitset"
 	"github.com/mitchellh/mapstructure"
 	"gopkg.in/dealancer/validate.v2"
 )
@@ -51,7 +50,7 @@ func TestBase64StringParse(t *testing.T) {
 }
 
 func TestBitSet(t *testing.T) {
-	bsGet := HttpMethodsToBitSet([]string{"GET"})
+	bsGet := ParseHttpMethods([]string{"GET"})
 
 	if bsGet.Test(MethodGet) != true {
 		t.Fail()
@@ -63,7 +62,7 @@ func TestBitSet(t *testing.T) {
 		t.Fail()
 	}
 
-	bsGetPost := HttpMethodsToBitSet([]string{"GET", "POST"})
+	bsGetPost := ParseHttpMethods([]string{"GET", "POST"})
 	if bsGetPost.Test(MethodGet) != true {
 		t.Fail()
 	}
@@ -77,7 +76,7 @@ func TestBitSet(t *testing.T) {
 
 func TestHttpMethodParse(t *testing.T) {
 	type TestStruct struct {
-		Methods *bitset.BitSet
+		Methods HttpMethods
 	}
 	output := new(TestStruct)
 
@@ -94,11 +93,11 @@ func TestHttpMethodParse(t *testing.T) {
 
 	decoder.Decode(input)
 
-	expected := bitset.New(8)
+	expected := BitSet(0)
 	expected.Set(MethodGet)
 	expected.Set(MethodPost)
 
-	if !output.Methods.Equal(expected) {
+	if output.Methods != HttpMethods(expected) {
 		t.Error(fmt.Errorf("No match: %+v != %+v", output.Methods, expected))
 	}
 }

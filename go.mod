@@ -3,7 +3,6 @@ module github.com/returntocorp/semgrep-network-broker
 go 1.19
 
 require (
-	github.com/bits-and-blooms/bitset v1.4.0
 	github.com/gin-gonic/gin v1.8.1
 	github.com/mcuadros/go-defaults v1.2.0
 	github.com/mitchellh/mapstructure v1.5.0

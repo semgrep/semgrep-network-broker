@@ -13,7 +13,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -o /semgrep-network-broker -ldflags="-X 'cmd.root.buildTime=$BUILDTIME' -X 'cmd.root.version=$VERSION' -X 'cmd.root.revision=$REVISION'"
+RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/returntocorp/semgrep-network-broker/build.BuildTime=$(BUILDTIME)' -X 'github.com/returntocorp/semgrep-network-broker/build.Version=$(VERSION)' -X 'github.com/returntocorp/semgrep-network-broker/build.Revision=$(REVISION)'"
 
 FROM alpine:3.17
 

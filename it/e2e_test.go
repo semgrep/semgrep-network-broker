@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mcuadros/go-defaults"
+	"github.com/returntocorp/semgrep-network-broker/cmd"
 	"github.com/returntocorp/semgrep-network-broker/pkg"
 
 	log "github.com/sirupsen/logrus"
@@ -93,10 +94,9 @@ func TestWireguardInboundProxy(t *testing.T) {
 	clientPrivateKey, _ := wgtypes.GeneratePrivateKey()
 	clientPublicKey := clientPrivateKey.PublicKey()
 	clientWireguardAddress := mustGetRandomPrivateAddress()
-	log.Info("prior to everything")
 
-	// setup wireguard
-	testWireguard := &pkg.WireguardBase{
+	// setup "remote" wireguard peer
+	remoteWireguardConfig := &pkg.WireguardBase{
 		LocalAddress: gatewayWireguardAddress.String(),
 		PrivateKey:   gatewayPrivateKey[:],
 		Peers: []pkg.WireguardPeer{
@@ -108,78 +108,76 @@ func TestWireguardInboundProxy(t *testing.T) {
 		},
 		ListenPort: gatewayWireguardPort,
 	}
-	defaults.SetDefaults(testWireguard)
-	testDev, testNet, err := pkg.SetupWireguard(testWireguard)
+	defaults.SetDefaults(remoteWireguardConfig)
+
+	remoteWireguard, remoteWireguardTeardown, err := remoteWireguardConfig.Start()
 	if err != nil {
-		t.Errorf("failed to setup wireguard: %v", err)
+		t.Errorf("failed to setup remote wireguard: %v", err)
 	}
+	defer remoteWireguardTeardown()
+	log.Info("Remote wireguard peer is up")
 
-	if err := testDev.Up(); err != nil {
-		t.Errorf("failed to bring up wireguard device: %v", err)
+	// set up internal service
+	internalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Hello")
+	}))
+	defer internalServer.Close()
+	log.Info("Internal server is up")
+
+	// start network broker
+	brokerConfig := &pkg.Config{
+		Inbound: pkg.InboundProxyConfig{
+			Wireguard: pkg.WireguardBase{
+				LocalAddress: clientWireguardAddress.String(),
+				PrivateKey:   clientPrivateKey[:],
+				Peers: []pkg.WireguardPeer{
+					{
+						PublicKey:  gatewayPublicKey[:],
+						AllowedIps: fmt.Sprintf("%v/128", gatewayWireguardAddress),
+						Endpoint:   fmt.Sprintf("127.0.0.1:%v", gatewayWireguardPort),
+					},
+				},
+			},
+			Allowlist: []pkg.AllowlistItem{
+				{
+					URL:     internalServer.URL + "/allowed-get",
+					Methods: pkg.ParseHttpMethods([]string{"GET"}),
+				},
+				{
+					URL:     internalServer.URL + "/allowed-post",
+					Methods: pkg.ParseHttpMethods([]string{"POST"}),
+				},
+			},
+			Heartbeat: pkg.HeartbeatConfig{
+				URL: fmt.Sprintf("http://[%v]/ping", gatewayWireguardAddress),
+			},
+		},
 	}
-	log.Info("Remote wireguard is up")
+	defaults.SetDefaults(brokerConfig)
 
-	defer testDev.Down()
+	teardown, err := cmd.StartNetworkBroker(brokerConfig)
+	if err != nil {
+		log.Error(err)
+	}
+	defer teardown()
+	log.Info("Network broker is up")
 
-	tc := testClient{
+	// set up "remote" HTTP client
+	remoteHttpClient := testClient{
 		Client: &http.Client{
 			Transport: &http.Transport{
-				DialContext: testNet.DialContext,
+				DialContext: remoteWireguard.DialContext,
 			},
 		},
 		PeerAddress: clientWireguardAddress,
 	}
 
-	// set up internal service
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Hello")
-	}))
-	defer server.Close()
-	log.Info("Test server is up")
-
-	// start network broker
-	inboundConfig := &pkg.InboundProxyConfig{
-		Wireguard: pkg.WireguardBase{
-			LocalAddress: clientWireguardAddress.String(),
-			PrivateKey:   clientPrivateKey[:],
-			Peers: []pkg.WireguardPeer{
-				{
-					PublicKey:  gatewayPublicKey[:],
-					AllowedIps: fmt.Sprintf("%v/128", gatewayWireguardAddress),
-					Endpoint:   fmt.Sprintf("127.0.0.1:%v", gatewayWireguardPort),
-				},
-			},
-		},
-		Allowlist: []pkg.AllowlistItem{
-			{
-				URL:     server.URL + "/allowed-get",
-				Methods: pkg.HttpMethodsToBitSet([]string{"GET"}),
-			},
-			{
-				URL:     server.URL + "/allowed-post",
-				Methods: pkg.HttpMethodsToBitSet([]string{"POST"}),
-			},
-		},
-		Heartbeat: pkg.HeartbeatConfig{
-			URL: fmt.Sprintf("http://[%v]/ping", gatewayWireguardAddress),
-		},
-	}
-	defaults.SetDefaults(inboundConfig)
-
-	inboundTeardown, err := inboundConfig.Start()
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	defer inboundTeardown()
-	log.Info("Test broker is up")
-
 	// it should proxy requests that match the allowlist
-	tc.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, server.URL), 200)
-	tc.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, server.URL), 200)
+	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServer.URL), 200)
+	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, internalServer.URL), 200)
 
 	// it should reject requests that don't match the allowlist
-	tc.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, server.URL), 403)
-	tc.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, server.URL), 403)
-	tc.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/https://google.com", clientWireguardAddress), 403)
+	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServer.URL), 403)
+	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, internalServer.URL), 403)
+	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/https://google.com", clientWireguardAddress), 403)
 }

@@ -12,6 +12,7 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
+	"gopkg.in/dealancer/validate.v2"
 )
 
 func (peer WireguardPeer) Validate() error {
@@ -33,7 +34,7 @@ func (peer WireguardPeer) WriteTo(sb io.StringWriter) {
 	}
 }
 
-func (base WireguardBase) String() string {
+func (base WireguardBase) GenerateConfig() string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(base.PrivateKey)))
@@ -70,36 +71,52 @@ func (base *WireguardBase) ResolvePeerEndpoints() error {
 	return nil
 }
 
-func SetupWireguard(base *WireguardBase) (*device.Device, *netstack.Net, error) {
-	if err := base.ResolvePeerEndpoints(); err != nil {
+func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
+	// ensure config is valid
+	if err := validate.Validate(config); err != nil {
+		return nil, nil, fmt.Errorf("invalid wireguard config: %v", err)
+	}
+
+	// resolve peer endpoints (if not IP address already)
+	if err := config.ResolvePeerEndpoints(); err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve peer endpoint: %v", err)
 	}
 
-	localAddress := netip.MustParseAddr(base.LocalAddress)
+	// parse localAddres and DNS addresses -- MustParseAddr is fine here because we've already validated the config
+	localAddress := netip.MustParseAddr(config.LocalAddress)
 
-	var dnsAddresses = make([]netip.Addr, len(base.Dns))
-	for i := range base.Dns {
-		dnsAddresses[i] = netip.MustParseAddr(base.Dns[i])
+	var dnsAddresses = make([]netip.Addr, len(config.Dns))
+	for i := range config.Dns {
+		dnsAddresses[i] = netip.MustParseAddr(config.Dns[i])
 	}
 
+	// create the wireguard interface
 	tun, tnet, err := netstack.CreateNetTUN(
 		[]netip.Addr{localAddress},
 		dnsAddresses,
-		base.Mtu,
+		config.Mtu,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create tun: %v", err)
+		return nil, nil, fmt.Errorf("failed to create wireguard tun: %v", err)
 	}
 
 	level := device.LogLevelError
-	if base.Verbose {
+	if config.Verbose {
 		level = device.LogLevelVerbose
 	}
+
+	// create wireguard device
 	dev := device.NewDevice(tun, conn.NewDefaultBind(), device.NewLogger(level, ""))
 
-	if err := dev.IpcSet(base.String()); err != nil {
-		return nil, nil, err
+	// apply wireguard configs
+	if err := dev.IpcSet(config.GenerateConfig()); err != nil {
+		return nil, nil, fmt.Errorf("failed to apply wireguard configs: %v", err)
 	}
 
-	return dev, tnet, nil
+	// finally, bring up the device
+	if err := dev.Up(); err != nil {
+		return nil, nil, fmt.Errorf("failed to bring up wireguard device: %v", err)
+	}
+
+	return tnet, dev.Down, nil
 }
