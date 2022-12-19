@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	ginprometheus "github.com/zsais/go-gin-prometheus"
+	"golang.zx2c4.com/wireguard/tun/netstack"
 	"gopkg.in/dealancer/validate.v2"
 )
 
@@ -19,26 +20,10 @@ const healthcheckPath = "/healthcheck"
 const destinationUrlParam = "destinationUrl"
 const proxyPath = "/proxy/*" + destinationUrlParam
 
-func (config *InboundProxyConfig) Start() (func() error, error) {
+func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	// ensure config is valid
 	if err := validate.Validate(config); err != nil {
-		return nil, fmt.Errorf("invalid inbound config: %v", err)
-	}
-
-	// setup wireguard
-	dev, tnet, err := SetupWireguard(&config.Wireguard)
-	if err != nil {
-		return nil, fmt.Errorf("failed to setup wireguard: %v", err)
-	}
-
-	if err := dev.Up(); err != nil {
-		return nil, fmt.Errorf("failed to bring up wireguard device: %v", err)
-	}
-
-	log.Info("Wireguard interface is UP:")
-	log.Infof("  Local Address: %v", config.Wireguard.LocalAddress)
-	for i := range config.Wireguard.Peers {
-		log.Infof("  Peer: %+v", config.Wireguard.Peers[i])
+		return fmt.Errorf("invalid inbound config: %v", err)
 	}
 
 	// setup http server
@@ -104,10 +89,5 @@ func (config *InboundProxyConfig) Start() (func() error, error) {
 		}
 	}()
 
-	heartbeatTeardown := config.Heartbeat.Start(tnet.DialContext)
-
-	return func() error {
-		heartbeatTeardown()
-		return dev.Down()
-	}, nil
+	return nil
 }

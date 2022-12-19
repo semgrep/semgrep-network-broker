@@ -25,11 +25,11 @@ func TestAllowlistSchemeMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
 			URL:     "https://foo.com/https-only",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 		AllowlistItem{
 			URL:     "http://foo.com/http-only",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 	}
 
@@ -43,15 +43,15 @@ func TestAllowlistMethodMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
 			URL:     "https://foo.com/get-only",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 		AllowlistItem{
 			URL:     "https://foo.com/post-only",
-			Methods: HttpMethodsToBitSet([]string{"POST"}),
+			Methods: ParseHttpMethods([]string{"POST"}),
 		},
 		AllowlistItem{
 			URL:     "https://foo.com/get-or-post",
-			Methods: HttpMethodsToBitSet([]string{"GET", "POST"}),
+			Methods: ParseHttpMethods([]string{"GET", "POST"}),
 		},
 	}
 
@@ -72,11 +72,11 @@ func TestAllowlistDomainMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
 			URL:     "https://foo.com/*",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 		AllowlistItem{
 			URL:     "https://bar.com/*",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 	}
 
@@ -89,15 +89,15 @@ func TestAllowlistPathMatch(t *testing.T) {
 	allowlist := &Allowlist{
 		AllowlistItem{
 			URL:     "https://foo.com/hardcoded-path",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 		AllowlistItem{
 			URL:     "https://foo.com/wildcard-path/*",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 		AllowlistItem{
 			URL:     "https://foo.com/variable-path/:variable",
-			Methods: HttpMethodsToBitSet([]string{"GET"}),
+			Methods: ParseHttpMethods([]string{"GET"}),
 		},
 	}
 

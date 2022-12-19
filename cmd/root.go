@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/returntocorp/semgrep-network-broker/build"
 	"github.com/returntocorp/semgrep-network-broker/pkg"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -16,23 +17,19 @@ import (
 
 var configFiles []string
 
-var buildTime = "no build time"
-var version = "no version"
-var revision = "no revision"
-
 var rootCmd = &cobra.Command{
 	Use:     "semgrep-network-broker",
-	Version: fmt.Sprintf("%s (%s at %s)", version, revision, buildTime),
+	Version: fmt.Sprintf("%s (%s at %s)", build.Version, build.Revision, build.BuildTime),
 	Short:   "semgrep-network-broker brokers network access to and from the Semgrep backend",
 	Run: func(cmd *cobra.Command, args []string) {
-		// configure clean shutdown
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-		done := make(chan bool, 1)
+		// setup signal handler for clean shutdown
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		doneCh := make(chan bool, 1)
 		go func() {
-			<-sigs
+			<-sigCh
 			log.Info("Shutting down...")
-			done <- true
+			doneCh <- true
 		}()
 
 		// load config(s)
@@ -41,16 +38,44 @@ var rootCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		// start inbound proxy (r2c --> customer)
-		teardown, err := config.Inbound.Start()
+		// start the broker
+		teardown, err := StartNetworkBroker(config)
 		if err != nil {
-			log.Panic(fmt.Errorf("failed to start inbound proxy: %v", err))
+			log.Panic(fmt.Errorf("failed to start broker: %v", err))
 		}
 		defer teardown()
 
-		// wait for termination
-		<-done
+		// wait for shutdown
+		<-doneCh
 	},
+}
+
+func StartNetworkBroker(config *pkg.Config) (func() error, error) {
+	// bring up wireguard interface
+	tnet, wireguardTeardown, err := config.Inbound.Wireguard.Start()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start wireguard: %v", err)
+	}
+
+	// start periodic heartbeats
+	heartbeatTeardown, err := config.Inbound.Heartbeat.Start(tnet, fmt.Sprintf("semgrep-network-broker/%v (rev %v)", build.Version, build.Revision))
+	if err != nil {
+		wireguardTeardown()
+		return nil, fmt.Errorf("heartbeat failed: %v", err)
+	}
+
+	teardown := func() error {
+		heartbeatTeardown()
+		return wireguardTeardown()
+	}
+
+	// start inbound proxy (r2c --> customer)
+	if err := config.Inbound.Start(tnet); err != nil {
+		teardown()
+		return nil, fmt.Errorf("failed to start inbound proxy: %v", err)
+	}
+
+	return teardown, nil
 }
 
 func Execute() {

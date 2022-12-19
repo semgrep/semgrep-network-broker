@@ -6,7 +6,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/bits-and-blooms/bitset"
 	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
@@ -57,6 +56,30 @@ type WireguardBase struct {
 	Verbose      bool            `mapstructure:"verbose"`
 }
 
+type BitTester interface {
+	Test(i uint) bool
+}
+
+type BitSet uint16
+
+func (bs BitSet) Test(i uint) bool {
+	return bs&(1<<i) != 0
+}
+
+func (bs *BitSet) Set(i uint) error {
+	if i >= 16 {
+		return fmt.Errorf("bitset limited to 16 bits")
+	}
+	*bs = *bs | (1 << i)
+	return nil
+}
+
+type HttpMethods BitSet
+
+func (methods HttpMethods) Test(i uint) bool {
+	return BitSet(methods).Test(i)
+}
+
 const (
 	MethodUnknown uint = iota
 	MethodGet
@@ -92,14 +115,14 @@ func LookupHttpMethod(method string) uint {
 	return MethodUnknown
 }
 
-func HttpMethodsToBitSet(methods []string) *bitset.BitSet {
-	bitset := bitset.New(8)
+func ParseHttpMethods(methods []string) HttpMethods {
+	bs := BitSet(0)
 
 	for _, method := range methods {
-		bitset.Set(LookupHttpMethod(method))
+		bs.Set(LookupHttpMethod(method))
 	}
 
-	return bitset
+	return HttpMethods(bs)
 }
 
 func httpMethodsDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
@@ -109,18 +132,16 @@ func httpMethodsDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (in
 	if f.Elem().Kind() != reflect.String {
 		return data, nil
 	}
-	if t != reflect.TypeOf(bitset.BitSet{}) {
+	if t != reflect.TypeOf(HttpMethods(0)) {
 		return data, nil
 	}
 
-	return HttpMethodsToBitSet(data.([]string)), nil
+	return ParseHttpMethods(data.([]string)), nil
 }
-
-type HttpMethods *bitset.BitSet
 
 type AllowlistItem struct {
 	URL                   string            `mapstructure:"url"`
-	Methods               *bitset.BitSet    `mapstructure:"methods"`
+	Methods               HttpMethods       `mapstructure:"methods"`
 	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders"`
 	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders"`
 }
@@ -132,10 +153,11 @@ type LoggingConfig struct {
 }
 
 type HeartbeatConfig struct {
-	URL                    string `mapstructure:"url" validate:"format=url"`
-	IntervalSeconds        int    `mapstructure:"intervalSeconds" validate:"gte=30" default:"60"`
-	TimeoutSeconds         int    `mapstructure:"timeoutSeconds" validate:"gt=0" default:"5"`
-	PanicAfterFailureCount int    `mapstructure:"panicAfterFailureCount" validate:"gte=0"`
+	URL                       string `mapstructure:"url" validate:"format=url"`
+	IntervalSeconds           int    `mapstructure:"intervalSeconds" validate:"gte=30" default:"60"`
+	TimeoutSeconds            int    `mapstructure:"timeoutSeconds" validate:"gt=0" default:"5"`
+	PanicAfterFailureCount    int    `mapstructure:"panicAfterFailureCount" validate:"gte=0"`
+	FirstHeartbeatMustSucceed bool   `mapstructure:"firstHeartbeatMustSucceed"`
 }
 
 type InboundProxyConfig struct {
