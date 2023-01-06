@@ -132,6 +132,9 @@ func httpMethodsDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (in
 	if t != reflect.TypeOf(HttpMethods(0)) {
 		return data, nil
 	}
+	if f.Elem().Kind() == reflect.String {
+		return ParseHttpMethods(data.([]string)), nil
+	}
 
 	methods := make([]string, len(data.([]interface{})))
 	for i, method := range data.([]interface{}) {
