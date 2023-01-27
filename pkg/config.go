@@ -3,11 +3,13 @@ package pkg
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 
 	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -15,6 +17,16 @@ type Base64String []byte
 
 func (bs Base64String) String() string {
 	return base64.StdEncoding.EncodeToString(bs)
+}
+
+func decodeBase64String(data string) (Base64String, error) {
+	bytes, err := base64.StdEncoding.DecodeString(data)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return Base64String(bytes), nil
 }
 
 func base64StringDecodeHook(
@@ -28,13 +40,8 @@ func base64StringDecodeHook(
 		return data, nil
 	}
 
-	bytes, err := base64.StdEncoding.DecodeString(data.(string))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return Base64String(bytes), nil
+	str := data.(string)
+	return decodeBase64String(str)
 }
 
 type WireguardPeer struct {
@@ -44,6 +51,11 @@ type WireguardPeer struct {
 	AllowedIps                  string `mapstructure:"allowedIps" validate:"format=cidr"`
 	PersistentKeepaliveInterval int    `mapstructure:"persistentKeepaliveInterval" validate:"gt=0" default:"20"`
 	DisablePersistentKeepalive  bool   `mapstructure:"disablePersistentKeepalive"`
+	ConfigureViaDNS             bool   `mapstructure:"configureViaDNS"`
+}
+
+func (peer *WireguardPeer) ShouldConfigureWithDns() bool {
+	return peer.ConfigureViaDNS && peer.Endpoint != "" && (peer.AllowedIps == "" || len(peer.PublicKey) == 0)
 }
 
 type WireguardBase struct {
@@ -181,6 +193,50 @@ type Config struct {
 	Inbound InboundProxyConfig `mapstructure:"inbound"`
 }
 
+func ConfigurePeerWithDns(peer *WireguardPeer) error {
+	if net.ParseIP(peer.Endpoint) != nil {
+		return fmt.Errorf("endpoint must be a domain name in order to use DNS configuration")
+	}
+	host := peer.Endpoint
+	if strings.Contains(peer.Endpoint, ":") {
+		hostPart, _, err := net.SplitHostPort(peer.Endpoint)
+		if err != nil {
+			return err
+		}
+		host = hostPart
+	}
+
+	records, err := net.LookupTXT(host)
+	if err != nil {
+		return err
+	}
+
+	for _, record := range records {
+		key, value, ok := strings.Cut(record, "=")
+		if !ok {
+			log.Warnf("Unparsable TXT record: %v", record)
+			continue
+		}
+		switch key {
+		case "publicKey":
+			if len(peer.PublicKey) == 0 {
+				decodedValue, err := decodeBase64String(value)
+				if err != nil {
+					return fmt.Errorf("failed to parse record %v: %v", record, err)
+				}
+				peer.PublicKey = decodedValue
+			}
+		case "allowedIps":
+			if peer.AllowedIps == "" {
+				peer.AllowedIps = value
+			}
+		default:
+			log.Warnf("Unhandled TXT record: %v", record)
+		}
+	}
+	return nil
+}
+
 func LoadConfig(configFiles []string) (*Config, error) {
 	config := new(Config)
 	for i := range configFiles {
@@ -195,5 +251,15 @@ func LoadConfig(configFiles []string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 	defaults.SetDefaults(config)
+
+	for i := range config.Inbound.Wireguard.Peers {
+		peer := &config.Inbound.Wireguard.Peers[i]
+		if peer.ShouldConfigureWithDns() {
+			if err := ConfigurePeerWithDns(peer); err != nil {
+				return nil, fmt.Errorf("error configuring wireguard.peer[%d] via DNS: %v", i, err)
+			}
+		}
+	}
+
 	return config, nil
 }
