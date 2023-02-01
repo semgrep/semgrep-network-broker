@@ -17,6 +17,13 @@ RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/returntocorp/se
 
 FROM alpine:3.17
 
+ARG UID=10001
+ARG GID=10001
+ARG USER=semgrep
+
+RUN addgroup -g ${GID} -S ${USER} && adduser -u ${UID} -S ${USER} -G ${USER}
+USER ${user}
+
 WORKDIR /
 
 COPY --from=build /semgrep-network-broker /semgrep-network-broker
