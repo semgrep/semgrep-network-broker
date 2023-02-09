@@ -9,9 +9,9 @@ import (
 	"golang.zx2c4.com/wireguard/tun/netstack"
 )
 
-func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func(), error) {
+func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (TeardownFunc, error) {
 	ticker := time.NewTicker(time.Duration(config.IntervalSeconds) * time.Second)
-	done := make(chan bool)
+	done := make(chan bool, 1)
 	failures := -1
 
 	httpClient := http.Client{
@@ -66,7 +66,8 @@ func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func
 		}
 	}()
 
-	return func() {
-		done <- true
+	return func() error {
+		close(done)
+		return nil
 	}, nil
 }

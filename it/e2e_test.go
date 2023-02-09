@@ -159,7 +159,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 	if err != nil {
 		log.Error(err)
 	}
-	defer teardown()
+	defer teardown.Teardown()
 	log.Info("Network broker is up")
 
 	// set up "remote" HTTP client

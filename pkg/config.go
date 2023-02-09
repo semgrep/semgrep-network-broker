@@ -170,11 +170,12 @@ type HeartbeatConfig struct {
 }
 
 type InboundProxyConfig struct {
-	Wireguard       WireguardBase   `mapstructure:"wireguard"`
-	Allowlist       Allowlist       `mapstructure:"allowlist"`
-	ProxyListenPort int             `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
-	Logging         LoggingConfig   `mapstructure:"logging"`
-	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat"`
+	Wireguard               WireguardBase   `mapstructure:"wireguard"`
+	Allowlist               Allowlist       `mapstructure:"allowlist"`
+	ProxyListenPort         int             `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
+	Logging                 LoggingConfig   `mapstructure:"logging"`
+	Heartbeat               HeartbeatConfig `mapstructure:"heartbeat"`
+	GracefulShutdownSeconds int             `mapstructure:"gracefulShutdownSeconds" validate:"gt=0" default:"30"`
 }
 
 type Config struct {

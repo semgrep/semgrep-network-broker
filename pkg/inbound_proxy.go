@@ -1,15 +1,16 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	ginprometheus "github.com/zsais/go-gin-prometheus"
 	"golang.zx2c4.com/wireguard/tun/netstack"
 	"gopkg.in/dealancer/validate.v2"
 )
@@ -20,10 +21,10 @@ const healthcheckPath = "/healthcheck"
 const destinationUrlParam = "destinationUrl"
 const proxyPath = "/proxy/*" + destinationUrlParam
 
-func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
+func (config *InboundProxyConfig) Start(tnet *netstack.Net) (TeardownFunc, error) {
 	// ensure config is valid
 	if err := validate.Validate(config); err != nil {
-		return fmt.Errorf("invalid inbound config: %v", err)
+		return nil, fmt.Errorf("invalid inbound config: %v", err)
 	}
 
 	// setup http server
@@ -35,10 +36,6 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 
 	// setup healthcheck
 	r.GET(healthcheckPath, func(c *gin.Context) { c.JSON(http.StatusOK, "OK") })
-
-	// setup metrics
-	p := ginprometheus.NewPrometheus("gin")
-	p.Use(r)
 
 	// setup http proxy
 	r.Any(proxyPath, func(c *gin.Context) {
@@ -76,18 +73,29 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		proxy.ServeHTTP(c.Writer, c.Request)
 	})
 
+	wireguardListener, err := tnet.ListenTCP(&net.TCPAddr{Port: config.ProxyListenPort})
+	if err != nil {
+		log.Panic(fmt.Errorf("failed to start TCP listener: %v", err))
+	}
+
+	server := http.Server{
+		Handler: r.Handler(),
+	}
 	// its showtime!
 	go func() {
-		wireguardListener, err := tnet.ListenTCP(&net.TCPAddr{Port: config.ProxyListenPort})
-		if err != nil {
-			log.Panic(fmt.Errorf("failed to start TCP listener: %v", err))
-		}
-
-		err = r.RunListener(wireguardListener)
-		if err != nil {
+		err := server.Serve(wireguardListener)
+		if err != nil && err != http.ErrServerClosed {
 			log.Panic(fmt.Errorf("failed to start http server: %v", err))
 		}
 	}()
 
-	return nil
+	return func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.GracefulShutdownSeconds)*time.Second)
+		err := server.Shutdown(ctx)
+		if err != nil && err == context.DeadlineExceeded {
+			log.Warnf("Failed to gracefully shutdown internal proxy after %d seconds", config.GracefulShutdownSeconds)
+		}
+		cancel()
+		return wireguardListener.Close()
+	}, nil
 }
