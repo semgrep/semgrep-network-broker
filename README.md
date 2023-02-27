@@ -18,15 +18,24 @@ Examples of inbound traffic include:
 
 - Run `make build` to generate the `semgrep-network-broker` binary
 - Run `make docker` to generate a docker image
-- Docker images are also published to ghcr.io/returntocorp/semgrep-network-broker
+- Docker images are also published to [ghcr.io/returntocorp/semgrep-network-broker](https://github.com/returntocorp/semgrep-network-broker/pkgs/container/semgrep-network-broker)
+
+### Keypairs
+
+The broker requires a Wireguard keypair in order to establish a secure connection.
+
+- `semgrep-network-broker genkey` generates a random private key in base64 and prints it to stdout
+- `semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout
+
+Your public key is safe to share. _Do not_ share your private key with anyone (including r2c).
 
 ### Configuration
 
-r2c will provide a configuration file tailored to your Semgrep deployment.
+r2c will help you create a configuration file tailored to your Semgrep deployment.
 
 **Do not** alter the `wireguard` and `heartbeat` sections.
 
-**Do not** share the value of `inbound.wireguard.privateKey`. Reach out to r2c on Slack if you need to rotate your Wireguard keys.
+**Do not** share the value of `inbound.wireguard.privateKey`. This is your organization's private key. Reach out to r2c on Slack if you need to rotate your Wireguard keys.
 
 Example:
 ```yaml
@@ -75,5 +84,7 @@ Config file(s) are passed to the app with `-c`:
 semgrep-network-broker -c config.yaml
 ```
 
+Multiple config files can be overlaid on top of each other by passing multiple `-c` args (ex. `semgrep-network-broker -c config1.yaml -c config2.yaml -c config3.yaml`). Note that while maps will be merged together, arrays will be _replaced_.
+
 Requirements:
-- internet access to `wireguard.TENANT.semgrep.dev` on UDP port 51820 (replace TENANT with your tenant name)
+- internet access to `wireguard.semgrep.dev` on UDP port 51820
