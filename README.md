@@ -74,6 +74,30 @@ inbound:
 
 ```
 
+### Real-world example
+
+Here's an example of allowing PR comments for a GitHub Enterprise instance hosted on https://git.example.com. Replace `<GH TOKEN>` with a GitHub PAT.
+
+```yaml
+allowlist:
+- url: https://git.example.com/api/v3/repos/:owner/:repo
+  methods: [GET]
+  setRequestHeaders:
+    Authorization: "Bearer <GH TOKEN>"
+- url: https://git.example.com/api/v3/repos/:owner/:repo/pulls
+  methods: [GET]
+  setRequestHeaders:
+    Authorization: "Bearer <GH TOKEN>"
+- url: https://git.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
+  methods: [POST]
+  setRequestHeaders:
+    Authorization: "Bearer <GH TOKEN>"
+- url: https://git.example.com/api/v3/repos/:owner/:repo/issues/:number/comments
+  methods: [POST]
+  setRequestHeaders:
+    Authorization: "Bearer <GH TOKEN>"
+```
+
 ## Usage
 
 The broker can be run in Kubernetes, as a bare Docker container, or simply as a standalone binary on a machine. Only one instance of the broker should be run at a time.
