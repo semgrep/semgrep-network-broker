@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,8 +14,18 @@ import (
 
 type Base64String []byte
 
-func (bs Base64String) String() string {
-	return base64.StdEncoding.EncodeToString(bs)
+func (bs Base64String) MarshalJSON() ([]byte, error) {
+	return json.Marshal(base64.StdEncoding.EncodeToString(bs))
+}
+
+type SensitiveBase64String []byte
+
+func (sbs SensitiveBase64String) String() string {
+	return "REDACTED"
+}
+
+func (sbs SensitiveBase64String) MarshalJSON() ([]byte, error) {
+	return json.Marshal(sbs.String())
 }
 
 func base64StringDecodeHook(
@@ -38,22 +49,22 @@ func base64StringDecodeHook(
 }
 
 type WireguardPeer struct {
-	PublicKey                   Base64String `mapstructure:"publicKey" validate:"empty=false"`
-	Endpoint                    string       `mapstructure:"endpoint"`
 	resolvedEndpoint            string
-	AllowedIps                  string `mapstructure:"allowedIps" validate:"format=cidr"`
-	PersistentKeepaliveInterval int    `mapstructure:"persistentKeepaliveInterval" validate:"gt=0" default:"20"`
-	DisablePersistentKeepalive  bool   `mapstructure:"disablePersistentKeepalive"`
+	PublicKey                   Base64String `mapstructure:"publicKey" json:"publicKey" validate:"empty=false"`
+	Endpoint                    string       `mapstructure:"endpoint" json:"endpoint"`
+	AllowedIps                  string       `mapstructure:"allowedIps" json:"allowedIps" validate:"format=cidr"`
+	PersistentKeepaliveInterval int          `mapstructure:"persistentKeepaliveInterval" json:"persistentKeepaliveInterval" validate:"gt=0" default:"20"`
+	DisablePersistentKeepalive  bool         `mapstructure:"disablePersistentKeepalive" json:"disablePersistentKeepalive"`
 }
 
 type WireguardBase struct {
-	LocalAddress string          `mapstructure:"localAddress" validate:"format=ip"`
-	Dns          []string        `mapstructure:"dns" validate:"empty=true > format=ip"`
-	Mtu          int             `mapstructure:"mtu" validate:"gte=0" default:"1420"`
-	PrivateKey   Base64String    `mapstructure:"privateKey" validate:"empty=false"`
-	ListenPort   int             `mapstructure:"listenPort" validate:"gte=0"`
-	Peers        []WireguardPeer `mapstructure:"peers" validate:"empty=false"`
-	Verbose      bool            `mapstructure:"verbose"`
+	LocalAddress string                `mapstructure:"localAddress" json:"localAddress" validate:"format=ip"`
+	Dns          []string              `mapstructure:"dns" json:"dns" validate:"empty=true > format=ip"`
+	Mtu          int                   `mapstructure:"mtu" json:"mtu" validate:"gte=0" default:"1420"`
+	PrivateKey   SensitiveBase64String `mapstructure:"privateKey" json:"privateKey" validate:"empty=false"`
+	ListenPort   int                   `mapstructure:"listenPort" json:"listenPort" validate:"gte=0"`
+	Peers        []WireguardPeer       `mapstructure:"peers" json:"peers" validate:"empty=false"`
+	Verbose      bool                  `mapstructure:"verbose" json:"verbose"`
 }
 
 type BitTester interface {
@@ -149,10 +160,10 @@ func httpMethodsDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (in
 }
 
 type AllowlistItem struct {
-	URL                   string            `mapstructure:"url"`
-	Methods               HttpMethods       `mapstructure:"methods"`
-	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders"`
-	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders"`
+	URL                   string            `mapstructure:"url" json:"url"`
+	Methods               HttpMethods       `mapstructure:"methods" json:"methods"`
+	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders" json:"setRequestHeaders"`
+	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders" json:"removeRequestHeaders"`
 }
 
 type Allowlist []AllowlistItem
@@ -162,23 +173,23 @@ type LoggingConfig struct {
 }
 
 type HeartbeatConfig struct {
-	URL                       string `mapstructure:"url" validate:"format=url"`
-	IntervalSeconds           int    `mapstructure:"intervalSeconds" validate:"gte=30" default:"60"`
-	TimeoutSeconds            int    `mapstructure:"timeoutSeconds" validate:"gt=0" default:"5"`
-	PanicAfterFailureCount    int    `mapstructure:"panicAfterFailureCount" validate:"gte=0"`
-	FirstHeartbeatMustSucceed bool   `mapstructure:"firstHeartbeatMustSucceed"`
+	URL                       string `mapstructure:"url" json:"url" validate:"format=url"`
+	IntervalSeconds           int    `mapstructure:"intervalSeconds" json:"intervalSeconds" validate:"gte=30" default:"60"`
+	TimeoutSeconds            int    `mapstructure:"timeoutSeconds" json:"timeoutSeconds" validate:"gt=0" default:"5"`
+	PanicAfterFailureCount    int    `mapstructure:"panicAfterFailureCount" json:"panicAfterFailureCount" validate:"gte=0"`
+	FirstHeartbeatMustSucceed bool   `mapstructure:"firstHeartbeatMustSucceed" json:"firstHeartbeatMustSucceed"`
 }
 
 type InboundProxyConfig struct {
-	Wireguard       WireguardBase   `mapstructure:"wireguard"`
-	Allowlist       Allowlist       `mapstructure:"allowlist"`
-	ProxyListenPort int             `mapstructure:"proxyListenPort" validate:"gte=0" default:"80"`
-	Logging         LoggingConfig   `mapstructure:"logging"`
-	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat"`
+	Wireguard       WireguardBase   `mapstructure:"wireguard" json:"wireguard"`
+	Allowlist       Allowlist       `mapstructure:"allowlist" json:"allowlist"`
+	ProxyListenPort int             `mapstructure:"proxyListenPort" json:"proxyListenPort" validate:"gte=0" default:"80"`
+	Logging         LoggingConfig   `mapstructure:"logging" json:"logging"`
+	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat" json:"heartbeat"`
 }
 
 type Config struct {
-	Inbound InboundProxyConfig `mapstructure:"inbound"`
+	Inbound InboundProxyConfig `mapstructure:"inbound" json:"inbound"`
 }
 
 func LoadConfig(configFiles []string) (*Config, error) {
