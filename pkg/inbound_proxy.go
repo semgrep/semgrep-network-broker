@@ -29,6 +29,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	// setup http server
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
+	r.UseRawPath = true // we want this proxy to be transparent, so don't un-escape characters in the URL
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
 		SkipPaths: config.Logging.SkipPaths,
 	}), gin.Recovery())
