@@ -49,6 +49,40 @@ func TestBase64StringParse(t *testing.T) {
 	}
 }
 
+func TestSensitiveBase64StringParse(t *testing.T) {
+	type TestStruct struct {
+		Foo SensitiveBase64String
+	}
+	output := new(TestStruct)
+
+	dc := &mapstructure.DecoderConfig{Result: output, DecodeHook: base64StringDecodeHook}
+
+	decoder, err := mapstructure.NewDecoder(dc)
+	if err != nil {
+		t.Error(err)
+	}
+
+	testValueBase64String := "KJR4EeL83nexOFihmdYciri7Mo7ciAq/b5/S0lREcns="
+	testValueBytes, err := base64.StdEncoding.DecodeString(testValueBase64String)
+	if err != nil {
+		t.Error(err)
+	}
+
+	input := map[string]interface{}{
+		"Foo": testValueBase64String,
+	}
+
+	decoder.Decode(input)
+
+	if reflect.DeepEqual(testValueBytes, output.Foo) {
+		t.Error("No match")
+	}
+
+	if output.Foo.String() != RedactedString {
+		t.Error("String value should have been redacted")
+	}
+}
+
 func TestBitSet(t *testing.T) {
 	bsGet := ParseHttpMethods([]string{"GET"})
 

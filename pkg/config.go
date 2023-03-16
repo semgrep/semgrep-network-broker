@@ -20,13 +20,18 @@ func (bs Base64String) MarshalJSON() ([]byte, error) {
 
 type SensitiveBase64String []byte
 
+const RedactedString = "REDACTED"
+
 func (sbs SensitiveBase64String) String() string {
-	return "REDACTED"
+	return RedactedString
 }
 
 func (sbs SensitiveBase64String) MarshalJSON() ([]byte, error) {
 	return json.Marshal(sbs.String())
 }
+
+var base64StringType = reflect.TypeOf(Base64String(nil))
+var sensitiveBase64StringType = reflect.TypeOf(SensitiveBase64String(nil))
 
 func base64StringDecodeHook(
 	f reflect.Type,
@@ -35,7 +40,8 @@ func base64StringDecodeHook(
 	if f.Kind() != reflect.String {
 		return data, nil
 	}
-	if t != reflect.TypeOf(Base64String(nil)) {
+
+	if t != base64StringType && t != sensitiveBase64StringType {
 		return data, nil
 	}
 
@@ -45,7 +51,11 @@ func base64StringDecodeHook(
 		return nil, err
 	}
 
-	return Base64String(bytes), nil
+	if t == sensitiveBase64StringType {
+		return SensitiveBase64String(bytes), err
+	} else {
+		return Base64String(bytes), err
+	}
 }
 
 type WireguardPeer struct {
