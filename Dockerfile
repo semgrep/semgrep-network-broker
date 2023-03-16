@@ -1,4 +1,4 @@
-FROM golang:1.19-alpine as build
+FROM golang:1.20-alpine as build
 
 ARG BUILDTIME
 ARG VERSION
@@ -17,15 +17,10 @@ RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/returntocorp/se
 
 FROM alpine:3.17
 
-ARG UID=10001
-ARG GID=10001
-ARG USER=semgrep
+RUN adduser -D semgrep
+USER semgrep
+WORKDIR /home/semgrep
 
-RUN addgroup -g ${GID} -S ${USER} && adduser -u ${UID} -S ${USER} -G ${USER}
-USER ${user}
+COPY --from=build /semgrep-network-broker /usr/bin/semgrep-network-broker
 
-WORKDIR /
-
-COPY --from=build /semgrep-network-broker /semgrep-network-broker
-
-ENTRYPOINT ["/semgrep-network-broker"]
+ENTRYPOINT ["/usr/bin/semgrep-network-broker"]
