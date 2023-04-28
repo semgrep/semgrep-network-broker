@@ -203,8 +203,21 @@ type InboundProxyConfig struct {
 	Unsafe          UnsafeConfig    `mapstructure:"unsafe" json:"unsafe"`
 }
 
+type FilteredRelayConfig struct {
+	DestinationURL string   `mapstructure:"destinationUrl"`
+	JSONPath       string   `mapstructure:"jsonPath"`
+	Contains       []string `mapstructure:"contains"`
+	Equals         []string `mapstructure:"equals"`
+}
+
+type OutboundProxyConfig struct {
+	Relay      map[string]FilteredRelayConfig `mapstructure:"relay" json:"relay"`
+	ListenPort int                            `mapstructure:"listenPort" json:"listenPort" validate:"gte=0" default:"8080"`
+}
+
 type Config struct {
-	Inbound InboundProxyConfig `mapstructure:"inbound" json:"inbound"`
+	Inbound  InboundProxyConfig  `mapstructure:"inbound" json:"inbound"`
+	Outbound OutboundProxyConfig `mapstructure:"outbound" json:"outbound"`
 }
 
 func LoadConfig(configFiles []string) (*Config, error) {
