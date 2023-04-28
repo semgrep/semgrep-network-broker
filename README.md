@@ -112,3 +112,33 @@ Multiple config files can be overlaid on top of each other by passing multiple `
 
 Requirements:
 - internet access to `wireguard.semgrep.dev` on UDP port 51820
+
+## Other Commands
+
+### dump
+
+`semgrep-network-broker dump` dumps the current config. This is useful to see what the result of multiple configurations overlays would result in
+
+### pubkey
+
+`semgrep-network-broker pubkey` generates a private key
+
+### genkey
+`semgrep-network-broker genkey` generates a public key for a given private key (via stdin)
+
+
+### relay
+`semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
+
+```yaml
+outbound:
+  listenPort: 8080
+  relay:
+    test:
+      destinationUrl: https://httpbin.org/anything
+      jsonPath: "$.foo"
+      equals:
+      - bar
+```
+
+would result in requests to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the JSON path query `$.foo` executed on the request body results in the string `bar`.
