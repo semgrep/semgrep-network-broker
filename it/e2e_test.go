@@ -126,7 +126,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 
 	// start network broker
 	brokerConfig := &pkg.Config{
-		Inbound: pkg.InboundProxyConfig{
+		Inbound: &pkg.InboundProxyConfig{
 			Wireguard: pkg.WireguardBase{
 				LocalAddress: clientWireguardAddress.String(),
 				PrivateKey:   clientPrivateKey[:],
@@ -155,7 +155,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 	}
 	defaults.SetDefaults(brokerConfig)
 
-	teardown, err := cmd.StartNetworkBroker(brokerConfig)
+	teardown, err := cmd.StartNetworkBroker(brokerConfig.Inbound)
 	if err != nil {
 		log.Error(err)
 	}
