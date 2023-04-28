@@ -38,27 +38,41 @@ var rootCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		// start the broker
-		teardown, err := StartNetworkBroker(config)
-		if err != nil {
-			log.Panic(fmt.Errorf("failed to start broker: %v", err))
+		if config.Inbound == nil && config.Outbound == nil {
+			log.Panic("need inbound and/or outbound config")
 		}
-		defer teardown()
+
+		// start the broker
+		if config.Inbound != nil {
+			teardown, err := StartNetworkBroker(config.Inbound)
+			if err != nil {
+				log.Panic(fmt.Errorf("failed to start broker: %v", err))
+			}
+			defer teardown()
+		}
+
+		// start the relay
+		if config.Outbound != nil {
+			// start outbound proxy (customer --> r2c)
+			if err := config.Outbound.Start(); err != nil {
+				log.Panic(fmt.Errorf("failed to start outbound proxy: %v", err))
+			}
+		}
 
 		// wait for shutdown
 		<-doneCh
 	},
 }
 
-func StartNetworkBroker(config *pkg.Config) (func() error, error) {
+func StartNetworkBroker(config *pkg.InboundProxyConfig) (func() error, error) {
 	// bring up wireguard interface
-	tnet, wireguardTeardown, err := config.Inbound.Wireguard.Start()
+	tnet, wireguardTeardown, err := config.Wireguard.Start()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start wireguard: %v", err)
 	}
 
 	// start periodic heartbeats
-	heartbeatTeardown, err := config.Inbound.Heartbeat.Start(tnet, fmt.Sprintf("semgrep-network-broker/%v (rev %v)", build.Version, build.Revision))
+	heartbeatTeardown, err := config.Heartbeat.Start(tnet, fmt.Sprintf("semgrep-network-broker/%v (rev %v)", build.Version, build.Revision))
 	if err != nil {
 		wireguardTeardown()
 		return nil, fmt.Errorf("heartbeat failed: %v", err)
@@ -70,7 +84,7 @@ func StartNetworkBroker(config *pkg.Config) (func() error, error) {
 	}
 
 	// start inbound proxy (r2c --> customer)
-	if err := config.Inbound.Start(tnet); err != nil {
+	if err := config.Start(tnet); err != nil {
 		teardown()
 		return nil, fmt.Errorf("failed to start inbound proxy: %v", err)
 	}
