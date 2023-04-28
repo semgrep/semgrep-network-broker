@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mcuadros/go-defaults"
 	"github.com/returntocorp/semgrep-network-broker/cmd"
@@ -168,6 +169,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 			Transport: &http.Transport{
 				DialContext: remoteWireguard.DialContext,
 			},
+			Timeout: 1 * time.Second,
 		},
 		PeerAddress: clientWireguardAddress,
 	}
