@@ -141,4 +141,6 @@ outbound:
       - bar
 ```
 
-would result in requests to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the JSON path query `$.foo` executed on the request body results in the string `bar`.
+would result in requests addressed to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the jsonpath query `$.foo` executed on the request body results in the string `bar`.
+
+Check out an example [here](./examples/github-pr-comment-relay.yaml) for how to use the relay for GitHub PR comments.
