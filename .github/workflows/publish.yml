@@ -32,7 +32,7 @@ jobs:
       - uses: depot/setup-action@v1
       - uses: depot/build-push-action@v1
         with:
-          project: 5w5ftgx5qw
+          project: ${{ env.DEPOT_PROJECT }}
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           platforms: linux/amd64,linux/arm64
