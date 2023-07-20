@@ -52,9 +52,51 @@ inbound:
   allowlist: [...]
 ```
 
+### GitHub
+
+The `github` configuration section simplifies granting Semgrep access to leave PR comments.
+
+Example:
+```yaml
+inbound:
+  github:
+    baseUrl: https://github.example.com/api/v3
+    token: ...
+```
+
+Under the hood, this config adds these allowlist items:
+
+- GET `https://github.example.com/api/v3/repos/:owner/:repo`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
+- POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
+- POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
+
+### GitLab
+
+Similarly, the `gitlab` configuration section grants Semgrep access to leave MR comments.
+
+Example:
+```yaml
+inbound:
+  gitlab:
+    baseUrl: https://gitlab.example.com/api/v4
+    token: ...
+```
+
+Under the hood, this config adds these allowlist items:
+
+- GET `https://gitlab.example.com/api/v4/projects/:project`
+- GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
+- GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`
+- GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
+- POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
+- PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
+- PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
+
+
 ### Allowlist
 
-The `allowlist` configuration section controls what HTTP requests are allowed to be forwarded out of the broker. The first matching allowlist item is used. No allowlist match means the request will not be proxied.
+The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. The first matching allowlist item is used. No allowlist match means the request will not be proxied.
 
 Examples:
 ```yaml
