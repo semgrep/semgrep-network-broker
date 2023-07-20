@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 
@@ -194,6 +195,16 @@ type UnsafeConfig struct {
 	ForceHTTP bool `mapstructure:"forceHttp" json:"forceHttp"`
 }
 
+type GitHub struct {
+	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token   string `mapstructure:"token" json:"token"`
+}
+
+type GitLab struct {
+	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token   string `mapstructure:"token" json:"token"`
+}
+
 type InboundProxyConfig struct {
 	Wireguard       WireguardBase   `mapstructure:"wireguard" json:"wireguard"`
 	Allowlist       Allowlist       `mapstructure:"allowlist" json:"allowlist"`
@@ -201,6 +212,8 @@ type InboundProxyConfig struct {
 	Logging         LoggingConfig   `mapstructure:"logging" json:"logging"`
 	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat" json:"heartbeat"`
 	Unsafe          UnsafeConfig    `mapstructure:"unsafe" json:"unsafe"`
+	GitHub          *GitHub         `mapstructure:"github" json:"github"`
+	GitLab          *GitLab         `mapstructure:"gitlab" json:"gitlab"`
 }
 
 type FilteredRelayConfig struct {
@@ -234,5 +247,97 @@ func LoadConfig(configFiles []string) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 	defaults.SetDefaults(config)
+
+	if config.Inbound.GitHub != nil {
+		gitHub := config.Inbound.GitHub
+
+		gitHubBaseUrl, err := url.Parse(gitHub.BaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse github base URL: %v", err)
+		}
+
+		headers := map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %v", gitHub.Token),
+		}
+
+		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// repo info
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo").String(),
+				Methods:           HttpMethods(MethodGet),
+				SetRequestHeaders: headers,
+			},
+			// PR info
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
+				Methods:           HttpMethods(MethodGet),
+				SetRequestHeaders: headers,
+			},
+			// post PR comment
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments").String(),
+				Methods:           HttpMethods(MethodPost),
+				SetRequestHeaders: headers,
+			},
+			// post issue comment
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
+				Methods:           HttpMethods(MethodPost),
+				SetRequestHeaders: headers,
+			})
+	}
+
+	if config.Inbound.GitLab != nil {
+		gitLab := config.Inbound.GitLab
+
+		gitLabBaseUrl, err := url.Parse(gitLab.BaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse gitlab base URL: %v", err)
+		}
+
+		headers := map[string]string{
+			"PRIVATE-TOKEN": gitLab.Token,
+		}
+
+		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// repo info
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project").String(),
+				Methods:           HttpMethods(MethodGet),
+				SetRequestHeaders: headers,
+			},
+			// MR info
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
+				Methods:           HttpMethods(MethodGet),
+				SetRequestHeaders: headers,
+			},
+			// MR versions
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/versions").String(),
+				Methods:           HttpMethods(MethodGet),
+				SetRequestHeaders: headers,
+			},
+			// post MR comment
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
+				Methods:           HttpMethods(MethodGet | MethodPost),
+				SetRequestHeaders: headers,
+			},
+			// update MR comment
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note").String(),
+				Methods:           HttpMethods(MethodPut),
+				SetRequestHeaders: headers,
+			},
+			// resolve MR comment
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion").String(),
+				Methods:           HttpMethods(MethodPut),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
 	return config, nil
 }
