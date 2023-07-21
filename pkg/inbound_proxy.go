@@ -54,6 +54,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		if !exists {
 			c.Header(errorResponseHeader, "1")
 			c.JSON(http.StatusForbidden, gin.H{"error": "url is not in allowlist"})
+			log.Warnf("url is not in allowlist: %s %s", c.Request.Method, destinationUrl)
 			return
 		}
 
