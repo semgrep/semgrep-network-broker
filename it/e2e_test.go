@@ -148,6 +148,10 @@ func TestWireguardInboundProxy(t *testing.T) {
 					URL:     internalServer.URL + "/allowed-post",
 					Methods: pkg.ParseHttpMethods([]string{"POST"}),
 				},
+				{
+					URL:     internalServer.URL + "/allowed-path/:path",
+					Methods: pkg.ParseHttpMethods([]string{"POST"}),
+				},
 			},
 			Heartbeat: pkg.HeartbeatConfig{
 				URL: fmt.Sprintf("http://[%v]/ping", gatewayWireguardAddress),
@@ -177,6 +181,10 @@ func TestWireguardInboundProxy(t *testing.T) {
 	// it should proxy requests that match the allowlist
 	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServer.URL), 200)
 	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, internalServer.URL), 200)
+	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-path/foobar", clientWireguardAddress, internalServer.URL), 200)
+
+	// it shouldnt decode urlencoded characters
+	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-path/%s", clientWireguardAddress, internalServer.URL, "foobar%2Fbla"), 200)
 
 	// it should reject requests that don't match the allowlist
 	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServer.URL), 403)
