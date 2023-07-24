@@ -19,7 +19,7 @@ func (config AllowlistItem) Matches(method string, url *url.URL) bool {
 	}
 
 	matcher := urlpath.New(parsedUrl.Path)
-	if _, matches := matcher.Match(url.Path); matches {
+	if _, matches := matcher.Match(url.EscapedPath()); matches {
 		return true
 	}
 

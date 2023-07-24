@@ -29,7 +29,11 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	// setup http server
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.UseRawPath = true // we want this proxy to be transparent, so don't un-escape characters in the URL
+
+	// we want this proxy to be transparent, so don't un-escape characters in the URL
+	r.UseRawPath = true
+	r.UnescapePathValues = false
+
 	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
 		SkipPaths: config.Logging.SkipPaths,
 	}), gin.Recovery())
@@ -59,6 +63,8 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		}
 
 		log.Infof("Proxying request: %s %s", c.Request.Method, destinationUrl)
+		log.Infof("Matched allowlist entry: %v", allowlistMatch)
+
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
 				req.URL = destinationUrl

@@ -99,6 +99,10 @@ func TestAllowlistPathMatch(t *testing.T) {
 			URL:     "https://foo.com/variable-path/:variable",
 			Methods: ParseHttpMethods([]string{"GET"}),
 		},
+		AllowlistItem{
+			URL:     "https://foo.com/variable-path/:variable/suffix",
+			Methods: ParseHttpMethods([]string{"GET"}),
+		},
 	}
 
 	// test path matching
@@ -108,4 +112,7 @@ func TestAllowlistPathMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/variable-path/a/b", false)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/hardcoded-path", true)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/hardcoded-path/bla", false)
+
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/variable-path/bla%2Fbla/suffix", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/variable-path/bla/bla/suffix", false)
 }
