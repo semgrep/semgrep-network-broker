@@ -180,8 +180,7 @@ type AllowlistItem struct {
 type Allowlist []AllowlistItem
 
 type LoggingConfig struct {
-	SkipPaths    []string `mapstructure:"skipPaths"`
-	LogResponses bool     `mapstructure:"logResponses" json:"logResponses"`
+	SkipPaths []string `mapstructure:"skipPaths"`
 }
 
 type HeartbeatConfig struct {
