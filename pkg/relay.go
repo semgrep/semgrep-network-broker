@@ -18,29 +18,36 @@ import (
 	"gopkg.in/dealancer/validate.v2"
 )
 
-func (config *FilteredRelayConfig) Matches(body io.Reader) (bool, error) {
-	if config.JSONPath == "" {
-		return true, nil
-	}
-
+func GetRequestBodyJSON(body io.Reader) (map[string]interface{}, error) {
 	var value = make(map[string]interface{})
 
 	if body != nil {
 		decoder := json.NewDecoder(body)
 
 		if err := decoder.Decode(&value); err != nil {
-			return false, fmt.Errorf("error decoding request body json: %v", err)
+			return nil, fmt.Errorf("error decoding request body json: %v", err)
 		}
+	}
+
+	return value, nil
+}
+
+func (config *FilteredRelayConfig) Matches(value map[string]interface{}) (bool, error) {
+	if config.JSONPath == "" {
+		return true, nil
 	}
 
 	result, err := jsonpath.Get(config.JSONPath, value)
 
 	if err != nil {
+		if strings.HasPrefix(err.Error(), "unknown key ") {
+			return false, nil
+		}
 		return false, fmt.Errorf("error evaluating jsonpath: %v", err)
 	}
 
 	if reflect.TypeOf(result).Kind() != reflect.String {
-		return false, fmt.Errorf("JSONPath result is not a string")
+		return false, fmt.Errorf("jsonpath result is not a string")
 	}
 
 	resultStr := result.(string)
@@ -65,16 +72,22 @@ func (config *OutboundProxyConfig) Start() error {
 	}
 
 	if len(config.Relay) == 0 {
+		log.Warn("relay.no_configs")
 		return nil
+	}
+
+	for k, v := range config.Relay {
+		log.WithField("path", fmt.Sprintf("/relay/%v", k)).WithField("destinationUrl", v.DestinationURL).WithField("jsonPath", v.JSONPath).WithField("equals", v.Equals).WithField("contains", v.Contains).Info("relay.configured")
 	}
 
 	// setup http server
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	r.Use(gin.Logger(), gin.Recovery())
+	r.Use(LoggerWithConfig(log.StandardLogger(), []string{}), gin.Recovery())
 
 	// setup healthcheck
 	r.GET(healthcheckPath, func(c *gin.Context) { c.JSON(http.StatusOK, "OK") })
+	log.WithField("path", healthcheckPath).Info("healthcheck.configured")
 
 	// setup metrics
 	p := ginprometheus.NewPrometheus("gin")
@@ -83,10 +96,12 @@ func (config *OutboundProxyConfig) Start() error {
 	// setup http proxy
 	r.Any("/relay/:name", func(c *gin.Context) {
 		relayName := c.Param("name")
+		logger := log.WithFields(GetRequestFields(c))
 
 		relayConfig, ok := config.Relay[relayName]
 
 		if !ok {
+			logger.Warn("relay.not_found")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("no such relay: %v", relayName)})
 			return
 		}
@@ -95,25 +110,34 @@ func (config *OutboundProxyConfig) Start() error {
 		buf.ReadFrom(c.Request.Body)
 		defer c.Request.Body.Close()
 
-		match, err := relayConfig.Matches(bytes.NewReader(buf.Bytes()))
+		obj, err := GetRequestBodyJSON(bytes.NewReader(buf.Bytes()))
 		if err != nil {
+			logger.WithError(err).Warn("relay.parse_json")
+		}
+
+		match, err := relayConfig.Matches(obj)
+		if err != nil {
+			logger.WithError(err).Info("relay.match_err")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("matching error: %v", err)})
 			return
 		}
 
 		if !match {
-			log.Infof("no match")
+			logger.Info("relay.no_match")
 			c.JSON(http.StatusOK, gin.H{"result": "no match"})
 			return
 		}
 
+		logger = logger.WithField("destinationUrl", relayConfig.DestinationURL)
+
 		destinationUrl, err := url.Parse(relayConfig.DestinationURL) // TODO: precompute this
 		if err != nil {
+			logger.WithError(err).Warn("relay.destination_url_parse")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("url parser error: %v", err)})
 			return
 		}
 
-		log.Infof("Proxying request: %s %s", c.Request.Method, destinationUrl)
+		logger.Info("relay.proxy_request")
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
 				req.Body = io.NopCloser(buf)
@@ -125,8 +149,9 @@ func (config *OutboundProxyConfig) Start() error {
 	})
 
 	// its showtime!
-	go r.Run(fmt.Sprintf(":%v", config.ListenPort))
-	log.Infof("Listening on :%v", config.ListenPort)
+	addr := fmt.Sprintf(":%v", config.ListenPort)
+	go r.Run(addr)
+	log.WithField("listen", addr).Info("relay.start")
 
 	return nil
 }
