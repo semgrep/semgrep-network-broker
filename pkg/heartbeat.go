@@ -22,9 +22,10 @@ func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func
 	}
 
 	execute := func() bool {
+		logger := log.WithField("heartbeat_url", config.URL)
 		req, err := http.NewRequest("GET", config.URL, nil)
 		if err != nil {
-			log.Panic(fmt.Errorf("invalid heartbeat request: %v", err))
+			logger.Panic(fmt.Errorf("invalid heartbeat request: %v", err))
 		}
 		if userAgent != "" {
 			req.Header.Set("User-Agent", userAgent)
@@ -36,16 +37,16 @@ func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func
 				log.Panicf("Heartbeat failed %v times in a row", failures)
 			}
 			if err != nil {
-				log.Warnf("Heartbeat failure: %v", err)
+				log.WithField("failure_count", failures).WithError(err).Warn("heartbeat.failure")
 			} else {
-				log.Warnf("Heartbeat failure: HTTP %v from %v", resp.StatusCode, config.URL)
+				log.WithField("failure_count", failures).WithField("status_code", resp.StatusCode).Warn("heartbeat.failure")
 			}
 			return false
 		} else {
 			if failures != 0 {
-				log.Info("Established connectivity with r2c")
+				log.WithField("message", "Established connectivity with Semgrep").Info("heartbeat.success")
 			}
-			log.Debug("Heartbeat OK")
+			log.Debug("heartbeat.success")
 			failures = 0
 			return true
 		}

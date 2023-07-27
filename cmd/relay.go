@@ -24,8 +24,8 @@ var relayCmd = &cobra.Command{
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		doneCh := make(chan bool, 1)
 		go func() {
-			<-sigCh
-			log.Info("Shutting down...")
+			sig := <-sigCh
+			log.WithField("signal", sig).Info("relay.shutdown")
 			doneCh <- true
 		}()
 

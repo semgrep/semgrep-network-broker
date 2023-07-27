@@ -34,21 +34,25 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	r.UseRawPath = true
 	r.UnescapePathValues = false
 
-	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-		SkipPaths: config.Logging.SkipPaths,
-	}), gin.Recovery())
+	r.Use(LoggerWithConfig(log.StandardLogger(), config.Logging.SkipPaths), gin.Recovery())
 
 	// setup healthcheck
 	r.GET(healthcheckPath, func(c *gin.Context) { c.JSON(http.StatusOK, "OK") })
+	log.WithField("path", healthcheckPath).Info("healthcheck.configured")
 
 	// setup metrics
 	p := ginprometheus.NewPrometheus("gin")
 	p.Use(r)
+	log.WithField("path", p.MetricsPath).Info("metrics.configured")
 
 	// setup http proxy
 	r.Any(proxyPath, func(c *gin.Context) {
+		logger := log.WithFields(GetRequestFields(c))
 		destinationUrl, err := url.Parse(c.Param(destinationUrlParam)[1:])
+		logger = logger.WithField("destinationUrl", destinationUrl)
+
 		if err != nil {
+			logger.WithError(err).Warn("proxy.destination_url_parse")
 			c.Header(errorResponseHeader, "1")
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
@@ -56,14 +60,13 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 
 		allowlistMatch, exists := config.Allowlist.FindMatch(c.Request.Method, destinationUrl)
 		if !exists {
+			log.Warn("allowlist.reject")
 			c.Header(errorResponseHeader, "1")
 			c.JSON(http.StatusForbidden, gin.H{"error": "url is not in allowlist"})
-			log.Warnf("url is not in allowlist: %s %s", c.Request.Method, destinationUrl)
 			return
 		}
 
-		log.Infof("Proxying request: %s %s", c.Request.Method, destinationUrl)
-		log.Infof("Matched allowlist entry: %v", allowlistMatch)
+		log.WithField("allowlist_match", fmt.Sprint(allowlistMatch)).Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
@@ -96,6 +99,8 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			log.Panic(fmt.Errorf("failed to start http server: %v", err))
 		}
 	}()
+
+	log.Info("broker.start")
 
 	return nil
 }
