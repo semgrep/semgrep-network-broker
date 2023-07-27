@@ -60,13 +60,13 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 
 		allowlistMatch, exists := config.Allowlist.FindMatch(c.Request.Method, destinationUrl)
 		if !exists {
-			log.Warn("allowlist.reject")
+			logger.Warn("allowlist.reject")
 			c.Header(errorResponseHeader, "1")
 			c.JSON(http.StatusForbidden, gin.H{"error": "url is not in allowlist"})
 			return
 		}
 
-		log.WithField("allowlist_match", fmt.Sprint(allowlistMatch)).Info("proxy.request")
+		logger.WithField("allowlist_match", fmt.Sprint(allowlistMatch)).Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
