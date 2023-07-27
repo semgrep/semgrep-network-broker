@@ -66,7 +66,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			return
 		}
 
-		logger.WithField("allowlist_match", fmt.Sprint(allowlistMatch)).Info("proxy.request")
+		logger.WithField("allowlist_match", allowlistMatch.URL).Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
