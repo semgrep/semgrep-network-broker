@@ -191,10 +191,6 @@ type HeartbeatConfig struct {
 	FirstHeartbeatMustSucceed bool   `mapstructure:"firstHeartbeatMustSucceed" json:"firstHeartbeatMustSucceed"`
 }
 
-type UnsafeConfig struct {
-	ForceHTTP bool `mapstructure:"forceHttp" json:"forceHttp"`
-}
-
 type GitHub struct {
 	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
 	Token   string `mapstructure:"token" json:"token"`
@@ -211,7 +207,6 @@ type InboundProxyConfig struct {
 	ProxyListenPort int             `mapstructure:"proxyListenPort" json:"proxyListenPort" validate:"gte=0" default:"80"`
 	Logging         LoggingConfig   `mapstructure:"logging" json:"logging"`
 	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat" json:"heartbeat"`
-	Unsafe          UnsafeConfig    `mapstructure:"unsafe" json:"unsafe"`
 	GitHub          *GitHub         `mapstructure:"github" json:"github"`
 	GitLab          *GitLab         `mapstructure:"gitlab" json:"gitlab"`
 }
