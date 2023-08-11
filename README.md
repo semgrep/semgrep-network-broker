@@ -25,7 +25,17 @@ Examples of inbound traffic include:
 The broker requires a Wireguard keypair in order to establish a secure connection.
 
 - `semgrep-network-broker genkey` generates a random private key in base64 and prints it to stdout
-- `echo "<PRIVATE KEY>" | semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout
+- `semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout
+
+#### Example
+
+```bash
+> semgrep-network-broker genkey
+some_private_key
+
+> echo "some_private_key" | semgrep-network-broker pubkey
+some_public_key
+```
 
 Your public key is safe to share. _Do not_ share your private key with anyone (including Semgrep).
 
@@ -167,7 +177,7 @@ Requirements:
 
 ### pubkey
 
-`echo "<PRIVATE KEY>" | semgrep-network-broker pubkey` generates a base64 public key for a given private key (via stdin)
+`semgrep-network-broker pubkey` generates a base64 public key for a given private key (via stdin)
 
 ### relay
 `semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
