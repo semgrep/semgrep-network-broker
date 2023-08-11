@@ -15,13 +15,17 @@ var relayCmd = &cobra.Command{
 	Use:   "relay",
 	Short: "Reads a base64 private key from stdin, outputs the corresponding base64 public key",
 	Run: func(cmd *cobra.Command, args []string) {
+		if jsonLog {
+			log.SetFormatter(&log.JSONFormatter{FieldMap: log.FieldMap{log.FieldKeyMsg: "event"}})
+		}
+
 		// setup signal handler for clean shutdown
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		doneCh := make(chan bool, 1)
 		go func() {
-			<-sigCh
-			log.Info("Shutting down...")
+			sig := <-sigCh
+			log.WithField("signal", sig).Info("relay.shutdown")
 			doneCh <- true
 		}()
 

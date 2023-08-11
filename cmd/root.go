@@ -16,19 +16,24 @@ import (
 )
 
 var configFiles []string
+var jsonLog bool
 
 var rootCmd = &cobra.Command{
 	Use:     "semgrep-network-broker",
 	Version: fmt.Sprintf("%s (%s at %s)", build.Version, build.Revision, build.BuildTime),
 	Short:   "semgrep-network-broker brokers network access to and from the Semgrep backend",
 	Run: func(cmd *cobra.Command, args []string) {
+		if jsonLog {
+			log.SetFormatter(&log.JSONFormatter{FieldMap: log.FieldMap{log.FieldKeyMsg: "event"}})
+		}
+
 		// setup signal handler for clean shutdown
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		doneCh := make(chan bool, 1)
 		go func() {
-			<-sigCh
-			log.Info("Shutting down...")
+			sig := <-sigCh
+			log.WithField("signal", sig).Info("broker.shutdown")
 			doneCh <- true
 		}()
 
@@ -87,4 +92,5 @@ func Execute() {
 
 func init() {
 	rootCmd.PersistentFlags().StringArrayVarP(&configFiles, "config", "c", nil, "config file(s)")
+	rootCmd.PersistentFlags().BoolVarP(&jsonLog, "json-log", "j", false, "JSON log output")
 }
