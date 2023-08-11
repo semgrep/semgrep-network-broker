@@ -4,7 +4,7 @@
 
 The Semgrep Network Broker facilitates secure access between Semgrep and a private network.
 
-The broker accomplishes this by establishing a Wireguard VPN tunnel with the Semgrep backend, and then proxying inbound (r2c --> customer) HTTP requests through this tunnel. This approach allows Semgrep to interact with on-prem resources without having to expose them to the public internet.
+The broker accomplishes this by establishing a Wireguard VPN tunnel with the Semgrep backend, and then proxying inbound (Semgrep --> customer) HTTP requests through this tunnel. This approach allows Semgrep to interact with on-prem resources without having to expose them to the public internet.
 
 Examples of inbound traffic include:
 
@@ -27,15 +27,25 @@ The broker requires a Wireguard keypair in order to establish a secure connectio
 - `semgrep-network-broker genkey` generates a random private key in base64 and prints it to stdout
 - `semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout
 
-Your public key is safe to share. _Do not_ share your private key with anyone (including r2c).
+#### Example
+
+```bash
+> semgrep-network-broker genkey
+some_private_key
+
+> echo "some_private_key" | semgrep-network-broker pubkey
+some_public_key
+```
+
+Your public key is safe to share. _Do not_ share your private key with anyone (including Semgrep).
 
 ### Configuration
 
-r2c will help you create a configuration file tailored to your Semgrep deployment.
+Semgrep will help you create a configuration file tailored to your Semgrep deployment.
 
 **Do not** alter the `wireguard` and `heartbeat` sections.
 
-**Do not** share the value of `inbound.wireguard.privateKey`. This is your organization's private key. Reach out to r2c on Slack if you need to rotate your Wireguard keys.
+**Do not** share the value of `inbound.wireguard.privateKey`. This is your organization's private key. Reach out to Semgrep on Slack if you need to rotate your Wireguard keys.
 
 Example:
 ```yaml
@@ -161,13 +171,13 @@ Requirements:
 
 `semgrep-network-broker dump` dumps the current config. This is useful to see what the result of multiple configurations overlays would result in
 
+### genkey
+
+`semgrep-network-broker genkey` generates a base64 private key to stdout
+
 ### pubkey
 
-`semgrep-network-broker pubkey` generates a private key
-
-### genkey
-`semgrep-network-broker genkey` generates a public key for a given private key (via stdin)
-
+`semgrep-network-broker pubkey` generates a base64 public key for a given private key (via stdin)
 
 ### relay
 `semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
