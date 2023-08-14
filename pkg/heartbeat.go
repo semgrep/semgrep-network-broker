@@ -52,6 +52,7 @@ func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func
 		}
 	}
 
+	log.WithField("first_heartbeat_must_succeed", config.FirstHeartbeatMustSucceed).Info("heartbeat.start")
 	success := execute()
 	if config.FirstHeartbeatMustSucceed && !success {
 		return nil, fmt.Errorf("first heartbeat did not succeed")
@@ -60,6 +61,7 @@ func (config *HeartbeatConfig) Start(tnet *netstack.Net, userAgent string) (func
 		for {
 			select {
 			case <-done:
+				log.Info("heartbeat.shutdown")
 				return
 			case <-ticker.C:
 				execute()
