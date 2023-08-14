@@ -1,8 +1,8 @@
 FROM golang:1.20-alpine as build
 
-ARG BUILDTIME
-ARG VERSION
-ARG REVISION
+ARG BUILDTIME=no-buildtime
+ARG VERSION=local-dev
+ARG REVISION=no-revision
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ RUN go mod download
 
 COPY . ./
 
-RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/returntocorp/semgrep-network-broker/build.BuildTime=$(BUILDTIME)' -X 'github.com/returntocorp/semgrep-network-broker/build.Version=$(VERSION)' -X 'github.com/returntocorp/semgrep-network-broker/build.Revision=$(REVISION)'"
+RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/returntocorp/semgrep-network-broker/build.BuildTime=${BUILDTIME}' -X 'github.com/returntocorp/semgrep-network-broker/build.Version=${VERSION}' -X 'github.com/returntocorp/semgrep-network-broker/build.Revision=${REVISION}'"
 
 FROM alpine:3.17
 
