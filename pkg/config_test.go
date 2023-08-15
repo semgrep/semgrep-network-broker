@@ -83,7 +83,7 @@ func TestSensitiveBase64StringParse(t *testing.T) {
 	}
 }
 
-func TestBitSet(t *testing.T) {
+func TestBitSetStringParse(t *testing.T) {
 	bsGet := ParseHttpMethods([]string{"GET"})
 
 	if bsGet.Test(MethodGet) != true {
@@ -108,7 +108,7 @@ func TestBitSet(t *testing.T) {
 	}
 }
 
-func TestHttpMethodParse(t *testing.T) {
+func TestHttpMethodsDecodeHook(t *testing.T) {
 	type TestStruct struct {
 		Methods HttpMethods
 	}
