@@ -57,6 +57,11 @@ func (config *FilteredRelayConfig) Matches(value map[string]interface{}) (bool, 
 			return true, nil
 		}
 	}
+	for _, val := range config.HasPrefix {
+		if strings.HasPrefix(resultStr, val) {
+			return true, nil
+		}
+	}
 	for _, val := range config.Contains {
 		if strings.Contains(resultStr, val) {
 			return true, nil
@@ -77,7 +82,7 @@ func (config *OutboundProxyConfig) Start() error {
 	}
 
 	for k, v := range config.Relay {
-		log.WithField("path", fmt.Sprintf("/relay/%v", k)).WithField("destinationUrl", v.DestinationURL).WithField("jsonPath", v.JSONPath).WithField("equals", v.Equals).WithField("contains", v.Contains).Info("relay.configured")
+		log.WithField("path", fmt.Sprintf("/relay/%v", k)).WithField("destinationUrl", v.DestinationURL).WithField("jsonPath", v.JSONPath).WithField("equals", v.Equals).WithField("hasPrefix", v.HasPrefix).WithField("contains", v.Contains).Info("relay.configured")
 	}
 
 	// setup http server

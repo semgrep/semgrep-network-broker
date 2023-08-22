@@ -1,4 +1,4 @@
-# This config is for the the semgrep-network-broker relay command
+# This config is for the semgrep-network-broker relay command
 #
 # You can test this out by:
 # 1. Running `semgrep-network-broker relay -c examples/github-pr-comment-relay.yaml`
@@ -12,5 +12,9 @@ outbound:
     github-pr-comments:
       destinationUrl: https://semgrep.dev/api/webhook
       jsonPath: "$.comment.body"
-      contains:
+      hasPrefix:
       - "/semgrep"
+      # it is also possible to support only a subset of available commands; for example, you could remove the line
+      # above and uncomment the line below to remove support for re-opening issues through PR review comments, while
+      # still allowing them to be ignored:
+      # - "/semgrep ignore"
