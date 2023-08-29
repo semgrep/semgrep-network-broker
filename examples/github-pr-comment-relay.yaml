@@ -12,9 +12,7 @@ outbound:
     github-pr-comments:
       destinationUrl: https://semgrep.dev/api/webhook
       jsonPath: "$.comment.body"
+      # Here, we use `hasPrefix` to ensure only PR comments beginning with "/semgrep"
+      # are relayed to the webhook destination.
       hasPrefix:
       - "/semgrep"
-      # it is also possible to support only a subset of available commands; for example, you could remove the line
-      # above and uncomment the line below to remove support for re-opening issues through PR review comments, while
-      # still allowing them to be ignored:
-      # - "/semgrep ignore"
