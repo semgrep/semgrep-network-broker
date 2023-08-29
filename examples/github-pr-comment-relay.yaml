@@ -1,4 +1,4 @@
-# This config is for the the semgrep-network-broker relay command
+# This config is for the semgrep-network-broker relay command
 #
 # You can test this out by:
 # 1. Running `semgrep-network-broker relay -c examples/github-pr-comment-relay.yaml`
@@ -12,5 +12,7 @@ outbound:
     github-pr-comments:
       destinationUrl: https://semgrep.dev/api/webhook
       jsonPath: "$.comment.body"
-      contains:
+      # Here, we use `hasPrefix` to ensure only PR comments beginning with "/semgrep"
+      # are relayed to the webhook destination.
+      hasPrefix:
       - "/semgrep"

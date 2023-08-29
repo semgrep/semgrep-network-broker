@@ -216,6 +216,7 @@ type FilteredRelayConfig struct {
 	JSONPath       string   `mapstructure:"jsonPath"`
 	Contains       []string `mapstructure:"contains"`
 	Equals         []string `mapstructure:"equals"`
+	HasPrefix      []string `mapstructure:"hasPrefix"`
 }
 
 type OutboundProxyConfig struct {
