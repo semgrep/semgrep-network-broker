@@ -49,16 +49,7 @@ type testClient struct {
 	Client      *http.Client
 }
 
-func (tc *testClient) Request(method string, rawUrl string) (int, string, error) {
-	url, err := url.Parse(rawUrl)
-	if err != nil {
-		return 0, "", err
-	}
-
-	req := &http.Request{
-		Method: method,
-		URL:    url,
-	}
+func (tc *testClient) Request(req *http.Request) (int, string, error) {
 	resp, err := tc.Client.Do(req)
 	if err != nil {
 		return 0, "", err
@@ -73,7 +64,21 @@ func (tc *testClient) Request(method string, rawUrl string) (int, string, error)
 }
 
 func (tc *testClient) AssertStatusCode(t *testing.T, method string, rawUrl string, expectedStatusCode int) {
-	statusCode, _, err := tc.Request(method, rawUrl)
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		t.Errorf("error while making %v %v: %v", method, rawUrl, err)
+	}
+
+	req := &http.Request{
+		Method: method,
+		URL:    url,
+	}
+
+	if method != "GET" {
+		req.Body = io.NopCloser(strings.NewReader("{\"foo\": 2}"))
+	}
+
+	statusCode, _, err := tc.Request(req)
 	if err != nil {
 		t.Errorf("error while making %v %v: %v", method, rawUrl, err)
 	}
@@ -155,6 +160,10 @@ func TestWireguardInboundProxy(t *testing.T) {
 			},
 			Heartbeat: pkg.HeartbeatConfig{
 				URL: fmt.Sprintf("http://[%v]/ping", gatewayWireguardAddress),
+			},
+			Logging: pkg.LoggingConfig{
+				LogRequestBody:  true,
+				LogResponseBody: true,
 			},
 		},
 	}

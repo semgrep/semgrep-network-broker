@@ -175,12 +175,16 @@ type AllowlistItem struct {
 	Methods               HttpMethods       `mapstructure:"methods" json:"methods"`
 	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders" json:"setRequestHeaders"`
 	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders" json:"removeRequestHeaders"`
+	LogRequestBody        bool              `mapstructure:"logRequests" json:"logRequestBody"`
+	LogResponseBody       bool              `mapstructure:"logResponses" json:"logResponseBody"`
 }
 
 type Allowlist []AllowlistItem
 
 type LoggingConfig struct {
-	SkipPaths []string `mapstructure:"skipPaths"`
+	SkipPaths       []string `mapstructure:"skipPaths" json:"skipPaths"`
+	LogRequestBody  bool     `mapstructure:"logRequests" json:"logRequestBody"`
+	LogResponseBody bool     `mapstructure:"logResponses" json:"logResponseBody"`
 }
 
 type HeartbeatConfig struct {
