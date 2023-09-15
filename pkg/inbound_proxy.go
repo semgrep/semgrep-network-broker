@@ -76,7 +76,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			reqBody.ReadFrom(c.Request.Body)
 			defer c.Request.Body.Close()
 			c.Request.Body = io.NopCloser(reqBody)
-			reqLogger = reqLogger.WithField("request_body", reqBody)
+			reqLogger = reqLogger.WithField("request_body", reqBody.String())
 		}
 
 		reqLogger.Info("proxy.request")
@@ -100,7 +100,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 					respBuf.ReadFrom(resp.Body)
 					defer resp.Body.Close()
 					resp.Body = io.NopCloser(respBuf)
-					respLogger = logger.WithField("response_body", respBuf)
+					respLogger = logger.WithField("response_body", respBuf.String())
 				}
 				respLogger.Info("proxy.response")
 				return nil
