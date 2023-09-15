@@ -150,6 +150,36 @@ allowlist:
     Authorization: "Bearer <GH TOKEN>"
 ```
 
+### Logging
+
+The `logging` configuration section allows you to set additional logging options for requests that are proxied through the broker.
+
+```yaml
+inbound:
+  logging:
+    logRequestBody: false   # If true, the contents of any proxied HTTP request matching the allowlist will be logged in the request_body field in the proxy.request event
+    logResponseBody: false  # If true, the contents of any proxied HTTP response will be logged in the response_body field in the proxy.response event
+```
+
+Here's an example log output of `curl -X POST -H "Content-Type: application/json" "https://httpbin.org/anything" -d '{"foo": "bar"}'` being proxied through the network broker:
+```
+INFO[0006] request.start                                 client_ip="::1" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= user_agent=curl/8.2.1
+INFO[0006] proxy.request                                 allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= request_body="{\"foo\": \"bar\"}" user_agent=curl/8.2.1
+INFO[0006] proxy.response                                allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= response_body="{\n  \"args\": {}, \n  \"data\": \"{\\\"foo\\\": \\\"bar\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Accept\": \"*/*\", \n    \"Accept-Encoding\": \"gzip\", \n    \"Content-Length\": \"14\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"User-Agent\": \"curl/8.2.1\", \n    \"X-Amzn-Trace-Id\": \"Root=1-650469a8-0032596526902b563d7e5ebc\"\n  }, \n  \"json\": {\n    \"foo\": \"bar\"\n  }, \n  \"method\": \"POST\", \n  \"origin\": \"::1, ...snip..., ...snip...\", \n  \"url\": \"https://httpbin.org/anything\"\n}\n" user_agent=curl/8.2.1
+INFO[0006] request.response                              body_size=511 client_ip="::1" id=1 latency=341.905708ms method=POST path="/proxy/https://httpbin.org/anything" query= status_code=200 user_agent=curl/8.2.1
+```
+
+`logRequestBody` and `logResponseBody` can also be set on a per-allowlist basis:
+
+```yaml
+inbound:
+  allowlist:
+  - url: https://httpbin.org/*
+    methods: [GET, POST, DELETE]
+    logRequestBody: true
+    logResponseBody: true
+```
+
 ## Usage
 
 The broker can be run in Kubernetes, as a bare Docker container, or simply as a standalone binary on a machine. Only one instance of the broker should be run at a time.
