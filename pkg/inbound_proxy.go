@@ -1,7 +1,9 @@
 package pkg
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -66,7 +68,18 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			return
 		}
 
-		logger.WithField("allowlist_match", allowlistMatch.URL).Info("proxy.request")
+		logger = logger.WithField("allowlist_match", allowlistMatch.URL)
+
+		reqLogger := logger
+		if config.Logging.LogRequestBody || allowlistMatch.LogRequestBody {
+			reqBody := &bytes.Buffer{}
+			reqBody.ReadFrom(c.Request.Body)
+			defer c.Request.Body.Close()
+			c.Request.Body = io.NopCloser(reqBody)
+			reqLogger = reqLogger.WithField("request_body", reqBody.String())
+		}
+
+		reqLogger.Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
 			Director: func(req *http.Request) {
@@ -81,6 +94,15 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 				for _, headerToRemove := range allowlistMatch.RemoveResponseHeaders {
 					resp.Header.Del(headerToRemove)
 				}
+				respLogger := logger
+				if config.Logging.LogResponseBody || allowlistMatch.LogResponseBody {
+					respBuf := &bytes.Buffer{}
+					respBuf.ReadFrom(resp.Body)
+					defer resp.Body.Close()
+					resp.Body = io.NopCloser(respBuf)
+					respLogger = logger.WithField("response_body", respBuf.String())
+				}
+				respLogger.Info("proxy.response")
 				return nil
 			},
 		}
