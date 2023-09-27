@@ -67,6 +67,14 @@ func (config *FilteredRelayConfig) Matches(value map[string]interface{}) (bool, 
 			return true, nil
 		}
 	}
+
+	for i := range config.AdditionalConfigs {
+		inner_match, inner_err := config.AdditionalConfigs[i].Matches(value)
+		if inner_match || inner_err != nil {
+			return inner_match, inner_err
+		}
+	}
+
 	return false, nil
 }
 

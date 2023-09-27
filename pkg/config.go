@@ -216,11 +216,12 @@ type InboundProxyConfig struct {
 }
 
 type FilteredRelayConfig struct {
-	DestinationURL string   `mapstructure:"destinationUrl"`
-	JSONPath       string   `mapstructure:"jsonPath"`
-	Contains       []string `mapstructure:"contains"`
-	Equals         []string `mapstructure:"equals"`
-	HasPrefix      []string `mapstructure:"hasPrefix"`
+	DestinationURL    string                `mapstructure:"destinationUrl"`
+	JSONPath          string                `mapstructure:"jsonPath"`
+	Contains          []string              `mapstructure:"contains"`
+	Equals            []string              `mapstructure:"equals"`
+	HasPrefix         []string              `mapstructure:"hasPrefix"`
+	AdditionalConfigs []FilteredRelayConfig `mapstructure:"additionalConfigs"` // this is awful, but we can refactor this in the near future
 }
 
 type OutboundProxyConfig struct {
