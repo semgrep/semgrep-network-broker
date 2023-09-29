@@ -226,3 +226,20 @@ outbound:
 would result in requests addressed to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the jsonpath query `$.foo` executed on the request body results in the string `bar`.
 
 Check out an example [here](./examples/github-pr-comment-relay.yaml) for how to use the relay for GitHub PR comments.
+
+You can also define additional relay mappings via the `additionalConfigs` field:
+
+```yaml
+outbound:
+  listenPort: 8080
+  relay:
+    test:
+      destinationUrl: https://httpbin.org/anything
+      jsonPath: "$.foo"
+      equals:
+      - bar
+      additionalConfigs:
+      - destinationUrl: htttps://example.com/fallback
+```
+
+The example above would relay traffic to https://httpbin.org/anything if the request body contains `{"foo": "bar"}`, otherwise, it'd relay traffic to `htttps://example.com/fallback`.
