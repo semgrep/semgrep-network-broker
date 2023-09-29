@@ -32,50 +32,50 @@ func GetRequestBodyJSON(body io.Reader) (map[string]interface{}, error) {
 	return value, nil
 }
 
-func (config *FilteredRelayConfig) Matches(value map[string]interface{}) (bool, error) {
+func (config *FilteredRelayConfig) FindMatch(value map[string]interface{}) (*FilteredRelayConfig, bool, error) {
 	if config.JSONPath == "" {
-		return true, nil
+		return config, true, nil
 	}
 
 	result, err := jsonpath.Get(config.JSONPath, value)
 
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "unknown key ") {
-			return false, nil
+			return config, false, nil
 		}
-		return false, fmt.Errorf("error evaluating jsonpath: %v", err)
+		return config, false, fmt.Errorf("error evaluating jsonpath: %v", err)
 	}
 
 	if reflect.TypeOf(result).Kind() != reflect.String {
-		return false, fmt.Errorf("jsonpath result is not a string")
+		return config, false, fmt.Errorf("jsonpath result is not a string")
 	}
 
 	resultStr := result.(string)
 
 	for _, val := range config.Equals {
 		if resultStr == val {
-			return true, nil
+			return config, true, nil
 		}
 	}
 	for _, val := range config.HasPrefix {
 		if strings.HasPrefix(resultStr, val) {
-			return true, nil
+			return config, true, nil
 		}
 	}
 	for _, val := range config.Contains {
 		if strings.Contains(resultStr, val) {
-			return true, nil
+			return config, true, nil
 		}
 	}
 
 	for i := range config.AdditionalConfigs {
-		inner_match, inner_err := config.AdditionalConfigs[i].Matches(value)
+		inner_config, inner_match, inner_err := config.AdditionalConfigs[i].FindMatch(value)
 		if inner_match || inner_err != nil {
-			return inner_match, inner_err
+			return inner_config, inner_match, inner_err
 		}
 	}
 
-	return false, nil
+	return config, false, nil
 }
 
 func (config *OutboundProxyConfig) Start() error {
@@ -128,7 +128,7 @@ func (config *OutboundProxyConfig) Start() error {
 			logger.WithError(err).Warn("relay.parse_json")
 		}
 
-		match, err := relayConfig.Matches(obj)
+		config, match, err := relayConfig.FindMatch(obj)
 		if err != nil {
 			logger.WithError(err).Info("relay.match_err")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("matching error: %v", err)})
@@ -141,9 +141,9 @@ func (config *OutboundProxyConfig) Start() error {
 			return
 		}
 
-		logger = logger.WithField("destinationUrl", relayConfig.DestinationURL)
+		logger = logger.WithField("destinationUrl", config.DestinationURL)
 
-		destinationUrl, err := url.Parse(relayConfig.DestinationURL) // TODO: precompute this
+		destinationUrl, err := url.Parse(config.DestinationURL) // TODO: precompute this
 		if err != nil {
 			logger.WithError(err).Warn("relay.destination_url_parse")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("url parser error: %v", err)})
