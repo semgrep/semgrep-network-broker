@@ -233,13 +233,13 @@ func TestRelay(t *testing.T) {
 					DestinationURL: internalServer.URL,
 					JSONPath:       "$.comment.body",
 					Contains:       []string{"/semgrep"},
-					HeadersContains: map[string]string{
+					HeaderEquals: map[string]string{
 						"X-GitHub-Event": "pull_request_review_comment",
 					},
 					AdditionalConfigs: []pkg.FilteredRelayConfig{
 						{
 							DestinationURL: internalServer2.URL,
-							HeadersNotContains: map[string]string{
+							HeaderNotEquals: map[string]string{
 								"X-GitHub-Event": "pull_request_review_comment",
 							},
 						},
