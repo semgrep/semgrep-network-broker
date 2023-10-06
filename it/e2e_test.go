@@ -303,9 +303,9 @@ func TestRelay(t *testing.T) {
 	resp, _ = http.DefaultClient.Do(req)
 	buf := new(strings.Builder)
 	io.Copy(buf, resp.Body)
-	assert.Equal(200, resp.StatusCode, "non-semgrep comment should return 200")
+	assert.Equal(200, resp.StatusCode, "semgrep comment should return 200")
 	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "semgrep comment should match")
-	assert.Equal("Server1", buf.String(), "request should be relayed to Server1")
+	assert.Equal("Server1", buf.String(), "semgrep comment should be relayed to Server1")
 
 	req = &http.Request{
 		Method: "POST",
@@ -320,5 +320,5 @@ func TestRelay(t *testing.T) {
 	io.Copy(bodyBuilder, resp.Body)
 	assert.Equal(200, resp.StatusCode, "other event should return 200")
 	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "other event should match")
-	assert.Equal("Server2", bodyBuilder.String(), "other event should hit other server")
+	assert.Equal("Server2", bodyBuilder.String(), "other event should be relayed to Server2")
 }
