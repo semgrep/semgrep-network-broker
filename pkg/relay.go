@@ -32,44 +32,68 @@ func GetRequestBodyJSON(body io.Reader) (map[string]interface{}, error) {
 	return value, nil
 }
 
-func (config *FilteredRelayConfig) FindMatch(value map[string]interface{}) (*FilteredRelayConfig, bool, error) {
-	if config.JSONPath == "" {
+func (config *FilteredRelayConfig) FindMatch(headers *http.Header, value map[string]interface{}) (*FilteredRelayConfig, bool, error) {
+	bodyMatch := true
+
+	if config.JSONPath != "" {
+		result, err := jsonpath.Get(config.JSONPath, value)
+
+		if err != nil {
+			if strings.HasPrefix(err.Error(), "unknown key ") {
+				result = ""
+			} else {
+				return config, false, fmt.Errorf("error evaluating jsonpath: %v", err)
+			}
+		}
+
+		if reflect.TypeOf(result).Kind() != reflect.String {
+			return config, false, fmt.Errorf("jsonpath result is not a string")
+		}
+
+		resultStr := result.(string)
+
+		for _, val := range config.Equals {
+			if resultStr != val {
+				bodyMatch = false
+				break
+			}
+		}
+		for _, val := range config.HasPrefix {
+			if !strings.HasPrefix(resultStr, val) {
+				bodyMatch = false
+				break
+			}
+		}
+		for _, val := range config.Contains {
+			if !strings.Contains(resultStr, val) {
+				bodyMatch = false
+				break
+			}
+		}
+	}
+
+	headerMatch := true
+
+	for k, v := range config.HeaderEquals {
+		if headers.Get(k) != v {
+			headerMatch = false
+			break
+		}
+	}
+
+	for k, v := range config.HeaderNotEquals {
+		if headers.Get(k) == v {
+			headerMatch = false
+			break
+		}
+	}
+
+	if bodyMatch && headerMatch {
 		return config, true, nil
 	}
 
-	result, err := jsonpath.Get(config.JSONPath, value)
-
-	if err != nil {
-		if strings.HasPrefix(err.Error(), "unknown key ") {
-			return config, false, nil
-		}
-		return config, false, fmt.Errorf("error evaluating jsonpath: %v", err)
-	}
-
-	if reflect.TypeOf(result).Kind() != reflect.String {
-		return config, false, fmt.Errorf("jsonpath result is not a string")
-	}
-
-	resultStr := result.(string)
-
-	for _, val := range config.Equals {
-		if resultStr == val {
-			return config, true, nil
-		}
-	}
-	for _, val := range config.HasPrefix {
-		if strings.HasPrefix(resultStr, val) {
-			return config, true, nil
-		}
-	}
-	for _, val := range config.Contains {
-		if strings.Contains(resultStr, val) {
-			return config, true, nil
-		}
-	}
-
 	for i := range config.AdditionalConfigs {
-		inner_config, inner_match, inner_err := config.AdditionalConfigs[i].FindMatch(value)
+		inner_config, inner_match, inner_err := config.AdditionalConfigs[i].FindMatch(headers, value)
 		if inner_match || inner_err != nil {
 			return inner_config, inner_match, inner_err
 		}
@@ -128,7 +152,7 @@ func (config *OutboundProxyConfig) Start() error {
 			logger.WithError(err).Warn("relay.parse_json")
 		}
 
-		config, match, err := relayConfig.FindMatch(obj)
+		config, match, err := relayConfig.FindMatch(&c.Request.Header, obj)
 		if err != nil {
 			logger.WithError(err).Info("relay.match_err")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("matching error: %v", err)})
@@ -137,9 +161,12 @@ func (config *OutboundProxyConfig) Start() error {
 
 		if !match {
 			logger.Info("relay.no_match")
+			c.Header("X-Semgrep-Network-Broker-Relay-Match", "0")
 			c.JSON(http.StatusOK, gin.H{"result": "no match"})
 			return
 		}
+
+		c.Header("X-Semgrep-Network-Broker-Relay-Match", "1")
 
 		logger = logger.WithField("destinationUrl", config.DestinationURL)
 

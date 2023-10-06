@@ -1,6 +1,7 @@
 package it
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -16,6 +17,7 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/returntocorp/semgrep-network-broker/cmd"
 	"github.com/returntocorp/semgrep-network-broker/pkg"
+	"github.com/stretchr/testify/assert"
 
 	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
@@ -199,4 +201,124 @@ func TestWireguardInboundProxy(t *testing.T) {
 	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServer.URL), 403)
 	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, internalServer.URL), 403)
 	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/https://google.com", clientWireguardAddress), 403)
+}
+
+func TestRelay(t *testing.T) {
+	assert := assert.New(t)
+
+	internalServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Server1")
+	}))
+	defer internalServer.Close()
+
+	internalServer2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Server2")
+	}))
+	defer internalServer2.Close()
+
+	relayPort := mustGetFreePort()
+
+	relayConfig := &pkg.Config{
+		Outbound: pkg.OutboundProxyConfig{
+			Relay: map[string]pkg.FilteredRelayConfig{
+				"always-succeed": {
+					DestinationURL: internalServer.URL,
+				},
+				"post-jsonpath-foo-bar": {
+					DestinationURL: internalServer.URL,
+					JSONPath:       "$.foo",
+					Equals:         []string{"bar"},
+				},
+				"github-pr-comment-with-fallback": {
+					DestinationURL: internalServer.URL,
+					JSONPath:       "$.comment.body",
+					Contains:       []string{"/semgrep"},
+					HeadersContains: map[string]string{
+						"X-GitHub-Event": "pull_request_review_comment",
+					},
+					AdditionalConfigs: []pkg.FilteredRelayConfig{
+						{
+							DestinationURL: internalServer2.URL,
+							HeadersNotContains: map[string]string{
+								"X-GitHub-Event": "pull_request_review_comment",
+							},
+						},
+					},
+				},
+			},
+			ListenPort: relayPort,
+		},
+	}
+
+	if err := relayConfig.Outbound.Start(); err != nil {
+		panic(err)
+	}
+
+	buildUrl := func(relayName string) *url.URL {
+		url, err := url.Parse(fmt.Sprintf("http://localhost:%v/relay/%v", relayPort, relayName))
+		if err != nil {
+			panic(err)
+		}
+		return url
+	}
+
+	var req *http.Request
+	var resp *http.Response
+	var bodyBuilder *strings.Builder
+
+	resp, _ = http.Get(buildUrl("not-real").String())
+	assert.Equal(400, resp.StatusCode, "Non-existent relay should 400")
+
+	resp, _ = http.Get(buildUrl("always-succeed").String())
+	assert.Equal(200, resp.StatusCode, "Always-succeed should 200")
+
+	resp, _ = http.Post(buildUrl("post-jsonpath-foo-bar").String(), "application/json", bytes.NewBufferString("{\"foo\": \"bar\"}"))
+	assert.Equal(200, resp.StatusCode, "foo: bar should return 200")
+	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "foo: bar should be a relay match")
+
+	resp, _ = http.Post(buildUrl("post-jsonpath-foo-bar").String(), "application/json", bytes.NewBufferString("{\"foo\": \"baz\"}"))
+	assert.Equal(200, resp.StatusCode, "foo: baz should return 200")
+	assert.Equal("0", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "foo: baz should not be a relay match")
+
+	req = &http.Request{
+		Method: "POST",
+		URL:    buildUrl("github-pr-comment-with-fallback"),
+		Header: http.Header{
+			"X-GitHub-Event": []string{"pull_request_review_comment"},
+		},
+		Body: io.NopCloser(bytes.NewBufferString("{\"comment\": {\"body\": \"hello\"}}")),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	assert.Equal(200, resp.StatusCode, "non-semgrep comment should return 200")
+	assert.Equal("0", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "non-semgrep comment should not match")
+
+	req = &http.Request{
+		Method: "POST",
+		URL:    buildUrl("github-pr-comment-with-fallback"),
+		Header: http.Header{
+			"X-GitHub-Event": []string{"pull_request_review_comment"},
+		},
+		Body: io.NopCloser(bytes.NewBufferString("{\"comment\": {\"body\": \"/semgrep test\"}}")),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	buf := new(strings.Builder)
+	io.Copy(buf, resp.Body)
+	assert.Equal(200, resp.StatusCode, "non-semgrep comment should return 200")
+	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "semgrep comment should match")
+	assert.Equal("Server1", buf.String(), "request should be relayed to Server1")
+
+	req = &http.Request{
+		Method: "POST",
+		URL:    buildUrl("github-pr-comment-with-fallback"),
+		Header: http.Header{
+			"X-GitHub-Event": []string{"issue"},
+		},
+		Body: io.NopCloser(bytes.NewBufferString("{\"foo\": \"bar\"}}")),
+	}
+	resp, _ = http.DefaultClient.Do(req)
+	bodyBuilder = new(strings.Builder)
+	io.Copy(bodyBuilder, resp.Body)
+	assert.Equal(200, resp.StatusCode, "other event should return 200")
+	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "other event should match")
+	assert.Equal("Server2", bodyBuilder.String(), "other event should hit other server")
 }
