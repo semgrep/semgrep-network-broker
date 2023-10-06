@@ -221,6 +221,8 @@ type FilteredRelayConfig struct {
 	Contains          []string              `mapstructure:"contains"`
 	Equals            []string              `mapstructure:"equals"`
 	HasPrefix         []string              `mapstructure:"hasPrefix"`
+	HeaderEquals      map[string]string     `mapstructure:"headerEquals"`
+	HeaderNotEquals   map[string]string     `mapstructure:"headerNotEquals"`
 	AdditionalConfigs []FilteredRelayConfig `mapstructure:"additionalConfigs"` // this is awful, but we can refactor this in the near future
 }
 
