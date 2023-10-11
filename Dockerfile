@@ -1,4 +1,4 @@
-FROM golang:1.20-alpine as build
+FROM golang:1.21-alpine as build
 
 ARG BUILDTIME=no-buildtime
 ARG VERSION=local-dev
