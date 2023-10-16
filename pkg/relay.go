@@ -25,6 +25,9 @@ func GetRequestBodyJSON(body io.Reader) (map[string]interface{}, error) {
 		decoder := json.NewDecoder(body)
 
 		if err := decoder.Decode(&value); err != nil {
+			if err == io.EOF {
+				return value, nil
+			}
 			return nil, fmt.Errorf("error decoding request body json: %v", err)
 		}
 	}
@@ -152,11 +155,19 @@ func (config *OutboundProxyConfig) Start() error {
 			logger.WithError(err).Warn("relay.parse_json")
 		}
 
-		config, match, err := relayConfig.FindMatch(&c.Request.Header, obj)
+		filteredRelayConfig, match, err := relayConfig.FindMatch(&c.Request.Header, obj)
 		if err != nil {
 			logger.WithError(err).Info("relay.match_err")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("matching error: %v", err)})
 			return
+		}
+
+		if config.Logging.LogRequestBody || filteredRelayConfig.LogRequestBody {
+			logger = logger.WithField("request_body", buf.String())
+		}
+
+		if config.Logging.LogRequestHeaders {
+			logger = logger.WithField("request_headers", c.Request.Header)
 		}
 
 		if !match {
@@ -168,9 +179,9 @@ func (config *OutboundProxyConfig) Start() error {
 
 		c.Header("X-Semgrep-Network-Broker-Relay-Match", "1")
 
-		logger = logger.WithField("destinationUrl", config.DestinationURL)
+		logger = logger.WithField("destinationUrl", filteredRelayConfig.DestinationURL)
 
-		destinationUrl, err := url.Parse(config.DestinationURL) // TODO: precompute this
+		destinationUrl, err := url.Parse(filteredRelayConfig.DestinationURL) // TODO: precompute this
 		if err != nil {
 			logger.WithError(err).Warn("relay.destination_url_parse")
 			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("url parser error: %v", err)})
@@ -183,6 +194,21 @@ func (config *OutboundProxyConfig) Start() error {
 				req.Body = io.NopCloser(buf)
 				req.URL = destinationUrl
 				req.Host = destinationUrl.Host
+			},
+			ModifyResponse: func(resp *http.Response) error {
+				respLogger := logger
+				if config.Logging.LogResponseBody || filteredRelayConfig.LogResponseBody {
+					respBuf := &bytes.Buffer{}
+					respBuf.ReadFrom(resp.Body)
+					defer resp.Body.Close()
+					resp.Body = io.NopCloser(respBuf)
+					respLogger = logger.WithField("response_body", respBuf.String())
+				}
+				if config.Logging.LogResponseHeaders || filteredRelayConfig.LogResponseHeaders {
+					respLogger = respLogger.WithField("response_headers", resp.Header)
+				}
+				respLogger.Info("relay.proxy_response")
+				return nil
 			},
 		}
 		proxy.ServeHTTP(c.Writer, c.Request)

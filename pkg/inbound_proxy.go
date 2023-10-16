@@ -79,6 +79,10 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			reqLogger = reqLogger.WithField("request_body", reqBody.String())
 		}
 
+		if config.Logging.LogRequestHeaders || allowlistMatch.LogRequestHeaders {
+			reqLogger = reqLogger.WithField("request_headers", c.Request.Header)
+		}
+
 		reqLogger.Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
@@ -101,6 +105,9 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 					defer resp.Body.Close()
 					resp.Body = io.NopCloser(respBuf)
 					respLogger = logger.WithField("response_body", respBuf.String())
+				}
+				if config.Logging.LogResponseHeaders || allowlistMatch.LogResponseHeaders {
+					respLogger = respLogger.WithField("response_headers", resp.Header)
 				}
 				respLogger.Info("proxy.response")
 				return nil
