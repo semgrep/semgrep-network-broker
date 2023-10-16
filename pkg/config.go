@@ -176,15 +176,19 @@ type AllowlistItem struct {
 	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders" json:"setRequestHeaders"`
 	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders" json:"removeRequestHeaders"`
 	LogRequestBody        bool              `mapstructure:"logRequestBody" json:"logRequestBody"`
+	LogRequestHeaders     bool              `mapstructure:"logRequestHeaders" json:"logRequestHeaders"`
 	LogResponseBody       bool              `mapstructure:"logResponseBody" json:"logResponseBody"`
+	LogResponseHeaders    bool              `mapstructure:"logResponseHeaders" json:"logResponseHeaders"`
 }
 
 type Allowlist []AllowlistItem
 
 type LoggingConfig struct {
-	SkipPaths       []string `mapstructure:"skipPaths" json:"skipPaths"`
-	LogRequestBody  bool     `mapstructure:"logRequestBody" json:"logRequestBody"`
-	LogResponseBody bool     `mapstructure:"logResponseBody" json:"logResponseBody"`
+	SkipPaths          []string `mapstructure:"skipPaths" json:"skipPaths"`
+	LogRequestBody     bool     `mapstructure:"logRequestBody" json:"logRequestBody"`
+	LogRequestHeaders  bool     `mapstructure:"logRequestHeaders" json:"logRequestHeaders"`
+	LogResponseBody    bool     `mapstructure:"logResponseBody" json:"logResponseBody"`
+	LogResponseHeaders bool     `mapstructure:"logResponseHeaders" json:"logResponseHeaders"`
 }
 
 type HeartbeatConfig struct {
@@ -224,10 +228,16 @@ type FilteredRelayConfig struct {
 	HeaderEquals      map[string]string     `mapstructure:"headerEquals"`
 	HeaderNotEquals   map[string]string     `mapstructure:"headerNotEquals"`
 	AdditionalConfigs []FilteredRelayConfig `mapstructure:"additionalConfigs"` // this is awful, but we can refactor this in the near future
+
+	LogRequestBody     bool `mapstructure:"logRequestBody" json:"logRequestBody"`
+	LogRequestHeaders  bool `mapstructure:"logRequestHeaders" json:"logRequestHeaders"`
+	LogResponseBody    bool `mapstructure:"logResponseBody" json:"logResponseBody"`
+	LogResponseHeaders bool `mapstructure:"logResponseHeaders" json:"logResponseHeaders"`
 }
 
 type OutboundProxyConfig struct {
 	Relay      map[string]FilteredRelayConfig `mapstructure:"relay" json:"relay"`
+	Logging    LoggingConfig                  `mapstructure:"logging" json:"logging"`
 	ListenPort int                            `mapstructure:"listenPort" json:"listenPort" validate:"gte=0" default:"8080"`
 }
 
