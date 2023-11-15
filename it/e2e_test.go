@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/mcuadros/go-defaults"
-	"github.com/returntocorp/semgrep-network-broker/cmd"
-	"github.com/returntocorp/semgrep-network-broker/pkg"
+	"github.com/semgrep/semgrep-network-broker/cmd"
+	"github.com/semgrep/semgrep-network-broker/pkg"
 	"github.com/stretchr/testify/assert"
 
 	log "github.com/sirupsen/logrus"

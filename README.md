@@ -18,7 +18,7 @@ Examples of inbound traffic include:
 
 - Run `make build` to generate the `semgrep-network-broker` binary
 - Run `make docker` to generate a docker image
-- Docker images are also published to [ghcr.io/returntocorp/semgrep-network-broker](https://github.com/returntocorp/semgrep-network-broker/pkgs/container/semgrep-network-broker)
+- Docker images are also published to [ghcr.io/semgrep/semgrep-network-broker](https://github.com/semgrep/semgrep-network-broker/pkgs/container/semgrep-network-broker)
 
 ### Keypairs
 
