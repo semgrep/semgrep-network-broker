@@ -9,8 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/returntocorp/semgrep-network-broker/build"
-	"github.com/returntocorp/semgrep-network-broker/pkg"
+	"github.com/semgrep/semgrep-network-broker/build"
+	"github.com/semgrep/semgrep-network-broker/pkg"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

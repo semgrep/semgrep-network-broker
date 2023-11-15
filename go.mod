@@ -1,4 +1,4 @@
-module github.com/returntocorp/semgrep-network-broker
+module github.com/semgrep/semgrep-network-broker
 
 go 1.21
 
