@@ -3,6 +3,11 @@ name: test
 on:
   workflow_dispatch:
   push:
+    branches:
+      - develop
+    tags:
+      - v*
+  pull_request:
 
 jobs:
   build:
