@@ -51,6 +51,10 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	r.Any(proxyPath, func(c *gin.Context) {
 		logger := log.WithFields(GetRequestFields(c))
 		destinationUrl, err := url.Parse(c.Param(destinationUrlParam)[1:])
+
+		// we have to explicitly copy over the query params
+		destinationUrl.RawQuery = c.Request.URL.RawQuery
+
 		logger = logger.WithField("destinationUrl", destinationUrl)
 
 		if err != nil {
