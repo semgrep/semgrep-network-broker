@@ -91,6 +91,35 @@ func (tc *testClient) AssertStatusCode(t *testing.T, method string, rawUrl strin
 	}
 }
 
+func (tc *testClient) AssertStatusAndContent(t *testing.T, method string, rawUrl string, expectedStatusCode int, expectedContent string) {
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		t.Errorf("error while making %v %v: %v", method, rawUrl, err)
+	}
+
+	req := &http.Request{
+		Method: method,
+		URL:    url,
+	}
+
+	if method != "GET" {
+		req.Body = io.NopCloser(strings.NewReader("{\"foo\": 2}"))
+	}
+
+	statusCode, content, err := tc.Request(req)
+	if err != nil {
+		t.Errorf("error while making %v %v: %v", method, rawUrl, err)
+	}
+
+	if statusCode != expectedStatusCode {
+		t.Errorf("%v %v returned HTTP %v, expected HTTP %v", method, rawUrl, statusCode, expectedStatusCode)
+	}
+
+	if content != expectedContent {
+		t.Errorf("%v %v returned '%v', expected '%v'", method, rawUrl, content, expectedContent)
+	}
+}
+
 func TestWireguardInboundProxy(t *testing.T) {
 	gatewayWireguardPort := mustGetFreePort()
 	gatewayWireguardAddress := mustGetRandomPrivateAddress()
@@ -145,6 +174,9 @@ func TestWireguardInboundProxy(t *testing.T) {
 	internalServer.Any("/allowed-path/:path", func(ctx *gin.Context) {
 		ctx.String(200, "Hello %v", ctx.GetString("path"))
 	})
+	internalServer.Any("/introspect/query-params", func(ctx *gin.Context) {
+		ctx.String(200, ctx.Request.URL.RawQuery)
+	})
 
 	internalListener, err := net.Listen("tcp", "127.0.0.1:")
 	if err != nil {
@@ -182,6 +214,10 @@ func TestWireguardInboundProxy(t *testing.T) {
 				{
 					URL:     internalServerBaseUrl + "/allowed-path/:path",
 					Methods: pkg.ParseHttpMethods([]string{"POST"}),
+				},
+				{
+					URL:     internalServerBaseUrl + "/introspect/*",
+					Methods: pkg.ParseHttpMethods([]string{"GET", "POST"}),
 				},
 			},
 			Heartbeat: pkg.HeartbeatConfig{
@@ -229,6 +265,9 @@ func TestWireguardInboundProxy(t *testing.T) {
 	remoteHttpClient.AssertStatusCode(t, "POST", fmt.Sprintf("http://[%v]/proxy/%v/allowed-get", clientWireguardAddress, internalServerBaseUrl), 403)
 	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/allowed-post", clientWireguardAddress, internalServerBaseUrl), 403)
 	remoteHttpClient.AssertStatusCode(t, "GET", fmt.Sprintf("http://[%v]/proxy/https://google.com", clientWireguardAddress), 403)
+
+	// it should include query params in the proxied request
+	remoteHttpClient.AssertStatusAndContent(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/introspect/query-params?foo=bar", clientWireguardAddress, internalServerBaseUrl), 200, "foo=bar")
 }
 
 func TestRelay(t *testing.T) {
