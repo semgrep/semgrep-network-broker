@@ -28,6 +28,12 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		return fmt.Errorf("invalid inbound config: %v", err)
 	}
 
+	// build http transport (needed for custom CA certs, etc...)
+	transport, err := config.HttpClient.BuildRoundTripper()
+	if err != nil {
+		return err
+	}
+
 	// setup http server
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -90,6 +96,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		reqLogger.Info("proxy.request")
 
 		proxy := httputil.ReverseProxy{
+			Transport: transport,
 			Director: func(req *http.Request) {
 				req.URL = destinationUrl
 				req.Host = destinationUrl.Host
