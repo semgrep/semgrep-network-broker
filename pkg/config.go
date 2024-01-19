@@ -209,14 +209,19 @@ type GitLab struct {
 	Token   string `mapstructure:"token" json:"token"`
 }
 
+type HttpClientConfig struct {
+	AdditionalCACerts []string `mapstructure:"additionalCACerts" json:"additionalCACerts"`
+}
+
 type InboundProxyConfig struct {
-	Wireguard       WireguardBase   `mapstructure:"wireguard" json:"wireguard"`
-	Allowlist       Allowlist       `mapstructure:"allowlist" json:"allowlist"`
-	ProxyListenPort int             `mapstructure:"proxyListenPort" json:"proxyListenPort" validate:"gte=0" default:"80"`
-	Logging         LoggingConfig   `mapstructure:"logging" json:"logging"`
-	Heartbeat       HeartbeatConfig `mapstructure:"heartbeat" json:"heartbeat"`
-	GitHub          *GitHub         `mapstructure:"github" json:"github"`
-	GitLab          *GitLab         `mapstructure:"gitlab" json:"gitlab"`
+	Wireguard       WireguardBase    `mapstructure:"wireguard" json:"wireguard"`
+	Allowlist       Allowlist        `mapstructure:"allowlist" json:"allowlist"`
+	ProxyListenPort int              `mapstructure:"proxyListenPort" json:"proxyListenPort" validate:"gte=0" default:"80"`
+	Logging         LoggingConfig    `mapstructure:"logging" json:"logging"`
+	Heartbeat       HeartbeatConfig  `mapstructure:"heartbeat" json:"heartbeat"`
+	GitHub          *GitHub          `mapstructure:"github" json:"github"`
+	GitLab          *GitLab          `mapstructure:"gitlab" json:"gitlab"`
+	HttpClient      HttpClientConfig `mapstructure:"httpClient" json:"httpClient"`
 }
 
 type FilteredRelayConfig struct {

@@ -62,6 +62,18 @@ inbound:
   allowlist: [...]
 ```
 
+### HttpClient
+
+The `httpClient` configuration section modifies the HTTP client used for proxying requests.
+
+Example:
+```yaml
+inbound:
+  httpClient:
+    additionalCACerts:
+    - /path/to/custom/cert.pem
+```
+
 ### GitHub
 
 The `github` configuration section simplifies granting Semgrep access to leave PR comments.
