@@ -305,8 +305,8 @@ func LoadConfig(configFiles []string) (*Config, error) {
 			},
 			// check app installation
 			AllowlistItem{
-				URL:							 gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
-				Methods:					 ParseHttpMethods([]string{"GET"}),
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			})
 	}
