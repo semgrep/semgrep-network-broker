@@ -302,13 +302,13 @@ func LoadConfig(configFiles []string) (*Config, error) {
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
-			})
+			},
 			// check app installation
 			AllowlistItem{
 				URL:							 gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
 				Methods:					 ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
-			}
+			})
 	}
 
 	if config.Inbound.GitLab != nil {
