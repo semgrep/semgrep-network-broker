@@ -48,6 +48,7 @@ Semgrep will help you create a configuration file tailored to your Semgrep deplo
 **Do not** share the value of `inbound.wireguard.privateKey`. This is your organization's private key. Reach out to Semgrep on Slack if you need to rotate your Wireguard keys.
 
 Example:
+
 ```yaml
 inbound:
   wireguard:
@@ -67,11 +68,12 @@ inbound:
 The `httpClient` configuration section modifies the HTTP client used for proxying requests.
 
 Example:
+
 ```yaml
 inbound:
   httpClient:
     additionalCACerts:
-    - /path/to/custom/cert.pem
+      - /path/to/custom/cert.pem
 ```
 
 ### GitHub
@@ -79,6 +81,7 @@ inbound:
 The `github` configuration section simplifies granting Semgrep access to leave PR comments.
 
 Example:
+
 ```yaml
 inbound:
   github:
@@ -90,6 +93,7 @@ Under the hood, this config adds these allowlist items:
 
 - GET `https://github.example.com/api/v3/repos/:owner/:repo`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
+- GET `https://github.example.com/api/v3/orgs/:org/installation`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 
@@ -98,6 +102,7 @@ Under the hood, this config adds these allowlist items:
 Similarly, the `gitlab` configuration section grants Semgrep access to leave MR comments.
 
 Example:
+
 ```yaml
 inbound:
   gitlab:
@@ -115,12 +120,12 @@ Under the hood, this config adds these allowlist items:
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
 
-
 ### Allowlist
 
 The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. The first matching allowlist item is used. No allowlist match means the request will not be proxied.
 
 Examples:
+
 ```yaml
 inbound:
   allowlist:
@@ -135,7 +140,6 @@ inbound:
       methods: [GET]
       setRequestHeaders:
         Authorization: "Bearer ...snip..."
-
 ```
 
 ### Real-world example
@@ -144,22 +148,22 @@ Here's an example of allowing PR comments for a GitHub Enterprise instance hoste
 
 ```yaml
 allowlist:
-- url: https://git.example.com/api/v3/repos/:owner/:repo
-  methods: [GET]
-  setRequestHeaders:
-    Authorization: "Bearer <GH TOKEN>"
-- url: https://git.example.com/api/v3/repos/:owner/:repo/pulls
-  methods: [GET]
-  setRequestHeaders:
-    Authorization: "Bearer <GH TOKEN>"
-- url: https://git.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
-  methods: [POST]
-  setRequestHeaders:
-    Authorization: "Bearer <GH TOKEN>"
-- url: https://git.example.com/api/v3/repos/:owner/:repo/issues/:number/comments
-  methods: [POST]
-  setRequestHeaders:
-    Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/issues/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
 ```
 
 ### Logging
@@ -169,11 +173,12 @@ The `logging` configuration section allows you to set additional logging options
 ```yaml
 inbound:
   logging:
-    logRequestBody: false   # If true, the contents of any proxied HTTP request matching the allowlist will be logged in the request_body field in the proxy.request event
-    logResponseBody: false  # If true, the contents of any proxied HTTP response will be logged in the response_body field in the proxy.response event
+    logRequestBody: false # If true, the contents of any proxied HTTP request matching the allowlist will be logged in the request_body field in the proxy.request event
+    logResponseBody: false # If true, the contents of any proxied HTTP response will be logged in the response_body field in the proxy.response event
 ```
 
 Here's an example log output of `curl -X POST -H "Content-Type: application/json" "https://httpbin.org/anything" -d '{"foo": "bar"}'` being proxied through the network broker:
+
 ```
 INFO[0006] request.start                                 client_ip="::1" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= user_agent=curl/8.2.1
 INFO[0006] proxy.request                                 allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= request_body="{\"foo\": \"bar\"}" user_agent=curl/8.2.1
@@ -186,10 +191,10 @@ INFO[0006] request.response                              body_size=511 client_ip
 ```yaml
 inbound:
   allowlist:
-  - url: https://httpbin.org/*
-    methods: [GET, POST, DELETE]
-    logRequestBody: true
-    logResponseBody: true
+    - url: https://httpbin.org/*
+      methods: [GET, POST, DELETE]
+      logRequestBody: true
+      logResponseBody: true
 ```
 
 ## Usage
@@ -205,6 +210,7 @@ semgrep-network-broker -c config.yaml
 Multiple config files can be overlaid on top of each other by passing multiple `-c` args (ex. `semgrep-network-broker -c config1.yaml -c config2.yaml -c config3.yaml`). Note that while maps will be merged together, arrays will be _replaced_.
 
 Requirements:
+
 - internet access to `wireguard.semgrep.dev` on UDP port 51820
 
 ## Other Commands
@@ -222,6 +228,7 @@ Requirements:
 `semgrep-network-broker pubkey` generates a base64 public key for a given private key (via stdin)
 
 ### relay
+
 `semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
 
 ```yaml
@@ -232,7 +239,7 @@ outbound:
       destinationUrl: https://httpbin.org/anything
       jsonPath: "$.foo"
       equals:
-      - bar
+        - bar
 ```
 
 would result in requests addressed to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the jsonpath query `$.foo` executed on the request body results in the string `bar`.
@@ -249,9 +256,9 @@ outbound:
       destinationUrl: https://httpbin.org/anything
       jsonPath: "$.foo"
       equals:
-      - bar
+        - bar
       additionalConfigs:
-      - destinationUrl: htttps://example.com/fallback
+        - destinationUrl: htttps://example.com/fallback
 ```
 
 The example above would relay traffic to https://httpbin.org/anything if the request body contains `{"foo": "bar"}`, otherwise, it'd relay traffic to `htttps://example.com/fallback`.
