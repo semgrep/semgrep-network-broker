@@ -94,6 +94,9 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/api/v3/repos/:owner/:repo`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
 - GET `https://github.example.com/api/v3/orgs/:org/installation`
+- GET `https://github.example.com/api/v3/orgs/:org/installation/repositories`
+- GET `https://github.example.com/api/v3/app`
+- POST `https://github.example.com/api/v3/app-manifests/:code/conversions`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 
