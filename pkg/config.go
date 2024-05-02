@@ -308,6 +308,24 @@ func LoadConfig(configFiles []string) (*Config, error) {
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
+			},
+			// check repo installation
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation/repositories").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// initiate app installation
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app-manifests/:code/conversions").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// get app installation
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
 			})
 	}
 
