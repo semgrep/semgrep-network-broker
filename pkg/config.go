@@ -317,7 +317,7 @@ func LoadConfig(configFiles []string) (*Config, error) {
 			},
 			// check app installation for a personal account
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation/repositories").String(),
+				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
