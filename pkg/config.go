@@ -303,15 +303,27 @@ func LoadConfig(configFiles []string) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
-			// check app installation
+			// check app installation for an org
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// check repo installation
+			// check repo installation for an org
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation/repositories").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// check app installation for a personal account
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation/repositories").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// check repo installation for a personal account
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation/repositories").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
