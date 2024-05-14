@@ -100,6 +100,14 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 			Director: func(req *http.Request) {
 				req.URL = destinationUrl
 				req.Host = destinationUrl.Host
+				if destinationUrl.User != nil {
+					destPassword, exists := destinationUrl.User.Password()
+					if exists {
+						req.SetBasicAuth(destinationUrl.User.Username(), destPassword)
+					} else {
+						req.SetBasicAuth(destinationUrl.User.Username(), "")
+					}
+				}
 				for headerName, headerValue := range allowlistMatch.SetRequestHeaders {
 					req.Header.Set(headerName, headerValue)
 				}
