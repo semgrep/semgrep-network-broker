@@ -11,7 +11,7 @@ import (
 )
 
 func TestEmptyConfigs(t *testing.T) {
-	config, err := LoadConfig(nil)
+	config, err := LoadConfig(nil, 0)
 	if err != nil {
 		t.Error(err)
 	}
