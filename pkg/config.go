@@ -4,7 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 
@@ -251,8 +254,47 @@ type Config struct {
 	Outbound OutboundProxyConfig `mapstructure:"outbound" json:"outbound"`
 }
 
-func LoadConfig(configFiles []string) (*Config, error) {
+func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	config := new(Config)
+
+	if deploymentId > 0 {
+		hostname := os.Getenv("SEMGREP_HOSTNAME")
+		if hostname == "" {
+			hostname = "semgrep.dev"
+		}
+		url := url.URL{
+			Scheme: "https",
+			Host:   hostname,
+			Path:   fmt.Sprintf("/api/broker/%d/default-config", deploymentId),
+		}
+
+		resp, err := http.Get(url.String())
+		if err != nil {
+			return nil, fmt.Errorf("failed to request default broker config from %v: %v", hostname, err)
+		}
+
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("failed to request default config from %s: HTTP %v", url.String(), resp.StatusCode)
+		}
+
+		f, err := os.CreateTemp("", "default-config*.json")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temp file to store default config: %v", err)
+		}
+		defer func() {
+			f.Close()
+			os.Remove(f.Name())
+		}()
+
+		io.Copy(f, resp.Body)
+		defer resp.Body.Close()
+
+		viper.SetConfigFile(f.Name())
+		if err := viper.MergeInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to merge config file '%s': %v", f.Name(), err)
+		}
+	}
+
 	for i := range configFiles {
 		viper.SetConfigFile(configFiles[i])
 		if err := viper.MergeInConfig(); err != nil {

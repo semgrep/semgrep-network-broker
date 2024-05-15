@@ -30,7 +30,7 @@ var relayCmd = &cobra.Command{
 		}()
 
 		// load config(s)
-		config, err := pkg.LoadConfig(configFiles)
+		config, err := pkg.LoadConfig(configFiles, 0)
 		if err != nil {
 			log.Panic(err)
 		}
