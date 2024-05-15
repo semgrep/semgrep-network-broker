@@ -17,6 +17,7 @@ import (
 
 var configFiles []string
 var jsonLog bool
+var deploymentId int
 
 var rootCmd = &cobra.Command{
 	Use:     "semgrep-network-broker",
@@ -38,7 +39,7 @@ var rootCmd = &cobra.Command{
 		}()
 
 		// load config(s)
-		config, err := pkg.LoadConfig(configFiles)
+		config, err := pkg.LoadConfig(configFiles, deploymentId)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -93,4 +94,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringArrayVarP(&configFiles, "config", "c", nil, "config file(s)")
 	rootCmd.PersistentFlags().BoolVarP(&jsonLog, "json-log", "j", false, "JSON log output")
+	rootCmd.PersistentFlags().IntVarP(&deploymentId, "deployment-id", "d", 0, "Semgrep deployment ID")
 }
