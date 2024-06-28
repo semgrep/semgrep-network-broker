@@ -229,7 +229,7 @@ type InboundProxyConfig struct {
 	Heartbeat       HeartbeatConfig  `mapstructure:"heartbeat" json:"heartbeat"`
 	GitHub          *GitHub          `mapstructure:"github" json:"github"`
 	GitLab          *GitLab          `mapstructure:"gitlab" json:"gitlab"`
-	BitBucket          *BitBucket          `mapstructure:"bitbucket" json:"bitbucket"`
+	BitBucket       *BitBucket          `mapstructure:"bitbucket" json:"bitbucket"`
 	HttpClient      HttpClientConfig `mapstructure:"httpClient" json:"httpClient"`
 }
 
