@@ -135,3 +135,30 @@ func TestHttpMethodsDecodeHook(t *testing.T) {
 		t.Error(fmt.Errorf("No match: %+v != %+v", output.Methods, expected))
 	}
 }
+
+
+func TestHttpMethodsDecodeHookEmpty(t *testing.T) {
+	type TestStruct struct {
+		Methods HttpMethods
+	}
+	output := new(TestStruct)
+
+	dc := &mapstructure.DecoderConfig{Result: output, DecodeHook: httpMethodsDecodeHook}
+
+	decoder, err := mapstructure.NewDecoder(dc)
+	if err != nil {
+		t.Error(err)
+	}
+
+	input := map[string]interface{}{
+		"Methods": []string{},
+	}
+
+	decoder.Decode(input)
+
+	expected := BitSet(0)
+
+	if output.Methods != HttpMethods(expected) {
+		t.Error(fmt.Errorf("No match: %+v != %+v", output.Methods, expected))
+	}
+}
