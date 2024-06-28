@@ -450,8 +450,13 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			return nil, fmt.Errorf("failed to parse bitbucket base URL: %v", err)
 		}
 
-		headers := map[string]string{
-			"PRIVATE-TOKEN": bitBucket.Token,
+		var headers map[string]string
+		if bitBucket.Token != "" {
+			headers = map[string]string{
+				"PRIVATE-TOKEN": bitBucket.Token,
+			}
+		} else {
+			headers = map[string]string{}
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
