@@ -212,6 +212,11 @@ type GitLab struct {
 	Token   string `mapstructure:"token" json:"token"`
 }
 
+type BitBucket struct {
+	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token   string `mapstructure:"token" json:"token"`
+}
+
 type HttpClientConfig struct {
 	AdditionalCACerts []string `mapstructure:"additionalCACerts" json:"additionalCACerts"`
 }
@@ -224,6 +229,7 @@ type InboundProxyConfig struct {
 	Heartbeat       HeartbeatConfig  `mapstructure:"heartbeat" json:"heartbeat"`
 	GitHub          *GitHub          `mapstructure:"github" json:"github"`
 	GitLab          *GitLab          `mapstructure:"gitlab" json:"gitlab"`
+	BitBucket			  *BitBucket       `mapstructure:"bitbucket" json:"bitbucket"`
 	HttpClient      HttpClientConfig `mapstructure:"httpClient" json:"httpClient"`
 }
 
@@ -434,6 +440,60 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			},
 		)
 	}
+
+	if config.Inbound.BitBucket != nil {
+		bitBucket := config.Inbound.BitBucket
+
+		bitBucketBaseUrl, err := url.Parse(bitBucket.BaseURL)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse bitbucket base URL: %v", err)
+		}
+
+		headers := map[string]string{
+			"PRIVATE-TOKEN": bitBucket.Token,
+		}
+
+		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// project info
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// get repos
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// repo info
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// default branch
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/default-branch").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// pull requests
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// post PR comment
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
 
 	return config, nil
 }

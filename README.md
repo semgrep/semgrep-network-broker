@@ -143,7 +143,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repo/:repo`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/default-branch`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/:repo/pull-requests`
-- POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:pr_id/comments`
+- POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/comments`
 
 ### Allowlist
 
