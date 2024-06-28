@@ -229,7 +229,7 @@ type InboundProxyConfig struct {
 	Heartbeat       HeartbeatConfig  `mapstructure:"heartbeat" json:"heartbeat"`
 	GitHub          *GitHub          `mapstructure:"github" json:"github"`
 	GitLab          *GitLab          `mapstructure:"gitlab" json:"gitlab"`
-	BitBucket       *BitBucket          `mapstructure:"bitbucket" json:"bitbucket"`
+	BitBucket       *BitBucket       `mapstructure:"bitbucket" json:"bitbucket"`
 	HttpClient      HttpClientConfig `mapstructure:"httpClient" json:"httpClient"`
 }
 
@@ -322,8 +322,13 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			return nil, fmt.Errorf("failed to parse github base URL: %v", err)
 		}
 
-		headers := map[string]string{
-			"Authorization": fmt.Sprintf("Bearer %v", gitHub.Token),
+		var headers map[string]string
+		if gitHub.Token != "" {
+			headers = map[string]string{
+				"Authorization": fmt.Sprintf("Bearer %v", gitHub.Token),
+			}
+		} else {
+			headers = map[string]string{}
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
@@ -397,8 +402,13 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			return nil, fmt.Errorf("failed to parse gitlab base URL: %v", err)
 		}
 
-		headers := map[string]string{
-			"PRIVATE-TOKEN": gitLab.Token,
+		var headers map[string]string
+		if gitLab.Token != "" {
+			headers = map[string]string{
+				"PRIVATE-TOKEN": gitLab.Token,
+			}
+		} else {
+			headers = map[string]string{}
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
@@ -453,7 +463,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		var headers map[string]string
 		if bitBucket.Token != "" {
 			headers = map[string]string{
-				"PRIVATE-TOKEN": bitBucket.Token,
+				"Authorization": fmt.Sprintf("Bearer %v", bitBucket.Token),
 			}
 		} else {
 			headers = map[string]string{}
@@ -498,7 +508,6 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			},
 		)
 	}
-
 
 	return config, nil
 }
