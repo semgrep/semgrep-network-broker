@@ -125,6 +125,26 @@ Under the hood, this config adds these allowlist items:
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
 
+### Bitbucket
+
+Similarly, the `bitbucket` configuration section grants Semgrep access to leave MR comments.
+
+```yaml
+inbound:
+  bitbucket:
+    baseUrl: https://bitbucket.example.com/rest/api/latest
+    token: ...
+```
+
+Under the hood, this config adds these allowlist items:
+
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project`
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos`
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repo/:repo`
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/default-branch`
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project/:repo/pull-requests`
+- POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/comments`
+
 ### Allowlist
 
 The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. The first matching allowlist item is used. No allowlist match means the request will not be proxied.
