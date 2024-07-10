@@ -412,6 +412,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// Group info
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/namespaces/:namespace").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// repo info
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project").String(),
