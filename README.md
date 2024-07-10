@@ -117,6 +117,7 @@ inbound:
 
 Under the hood, this config adds these allowlist items:
 
+- GET `https://gitlab.example.com/api/v4/namespaces/:namespace`
 - GET `https://gitlab.example.com/api/v4/projects/:project`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`
