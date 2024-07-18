@@ -225,7 +225,7 @@ inbound:
 
 ## Usage
 
-The broker can be run in Kubernetes, as a bare Docker container, or simply as a standalone binary on a machine. Only one instance of the broker should be run at a time.
+The broker can be run in Kubernetes, as a bare Docker container, or simply as a standalone binary on a machine. If more than one instance of the broker is run at a time to manage availability, you may see some noise in the logs as the broker is not yet architected with this specific configuration in mind. However, it should still perform correctly without duplicating requests.
 
 Config file(s) are passed to the app with `-c`:
 
