@@ -113,6 +113,7 @@ inbound:
   gitlab:
     baseUrl: https://gitlab.example.com/api/v4
     token: ...
+    allowCodeAccess: false  # default is false, set to true to allow Semgrep to read file contents
 ```
 
 Under the hood, this config adds these allowlist items:
@@ -125,6 +126,10 @@ Under the hood, this config adds these allowlist items:
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
+
+And if `allowCodeAccess` is set, additionally:
+
+- GET `https://gitlab.example.com/api/v4/projects/:project/repository/files/:filepath`
 
 ### Bitbucket
 
