@@ -208,8 +208,9 @@ type GitHub struct {
 }
 
 type GitLab struct {
-	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token   string `mapstructure:"token" json:"token"`
+	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           string `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type BitBucket struct {
@@ -455,6 +456,17 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				SetRequestHeaders: headers,
 			},
 		)
+
+		if config.Inbound.GitLab.AllowCodeAccess {
+			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+				// get contents of file
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/:filepath").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+			)
+		}
 	}
 
 	if config.Inbound.BitBucket != nil {
