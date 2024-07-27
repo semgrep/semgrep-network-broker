@@ -87,6 +87,7 @@ inbound:
   github:
     baseUrl: https://github.example.com/api/v3
     token: ...
+    allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
 Under the hood, this config adds these allowlist items:
