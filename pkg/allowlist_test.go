@@ -108,6 +108,8 @@ func TestAllowlistPathMatch(t *testing.T) {
 	// test path matching
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/wildcard-path/a", true)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/wildcard-path/a/b", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/wildcard-path/a/b?foo=bar", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/wildcard-path/a/b?foo=bar#baz", true)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/variable-path/a", true)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/variable-path/a/b", false)
 	assertAllowlistMatch(t, allowlist, "GET", "https://foo.com/hardcoded-path", true)
