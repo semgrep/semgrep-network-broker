@@ -102,6 +102,11 @@ Under the hood, this config adds these allowlist items:
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 
+And if `allowCodeAccess` is set, additionally:
+
+- GET `https://github.example.com/api/v3/repos/:repo/contents/:filepath`
+- GET `https://github.example.com/api/v3/repos/:repo/commits`
+
 ### GitLab
 
 Similarly, the `gitlab` configuration section grants Semgrep access to leave MR comments.

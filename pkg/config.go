@@ -203,8 +203,9 @@ type HeartbeatConfig struct {
 }
 
 type GitHub struct {
-	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token   string `mapstructure:"token" json:"token"`
+	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           string `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type GitLab struct {
@@ -214,8 +215,9 @@ type GitLab struct {
 }
 
 type BitBucket struct {
-	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token   string `mapstructure:"token" json:"token"`
+	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           string `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type HttpClientConfig struct {
@@ -393,6 +395,23 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			})
+
+		if config.Inbound.GitHub.AllowCodeAccess {
+			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+				// get contents of file
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:repo/contents/:filepath").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Commits
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:repo/commits").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+			)
+		}
 	}
 
 	if config.Inbound.GitLab != nil {
