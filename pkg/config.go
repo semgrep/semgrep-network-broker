@@ -215,9 +215,8 @@ type GitLab struct {
 }
 
 type BitBucket struct {
-	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token   string `mapstructure:"token" json:"token"`
 }
 
 type HttpClientConfig struct {
@@ -564,6 +563,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			// post PR comment
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// post blockerPR comment
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/blocker-comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
