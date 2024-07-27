@@ -203,8 +203,9 @@ type HeartbeatConfig struct {
 }
 
 type GitHub struct {
-	BaseURL string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token   string `mapstructure:"token" json:"token"`
+	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           string `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type GitLab struct {
@@ -393,6 +394,23 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			})
+
+		if config.Inbound.GitHub.AllowCodeAccess {
+			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+				// get contents of file
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:repo/contents/:filepath").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Commits
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:repo/commits").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+			)
+		}
 	}
 
 	if config.Inbound.GitLab != nil {
@@ -437,10 +455,28 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// Projects
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/:entity_type/:namespace/projects").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Branches
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post MR comment
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
 				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			// post MR comment reply
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
 			// update MR comment
@@ -462,6 +498,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				// get contents of file
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/:filepath").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Commits
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
@@ -521,6 +563,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			// post PR comment
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// post blockerPR comment
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/blocker-comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
