@@ -437,10 +437,40 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// Projects
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/:entity_type/:namespace/projects").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Commits
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Branches
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// File content
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/:filepath").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post MR comment
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
 				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			// post MR comment reply
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
 			// update MR comment
