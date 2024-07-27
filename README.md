@@ -123,9 +123,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
-- GET `https://gitlab.example.com/api/v4/projects/:project/repository/commits`
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
-- GET `https://gitlab.example.com/api/v4/projects/:project/repository/files/:path`
 - GET `https://gitlab.example.com/api/v4/:entity_type/:namespace/projects`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes`
@@ -135,6 +133,7 @@ Under the hood, this config adds these allowlist items:
 And if `allowCodeAccess` is set, additionally:
 
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/files/:filepath`
+- GET `https://gitlab.example.com/api/v4/projects/:project/repository/commits`
 
 ### Bitbucket
 

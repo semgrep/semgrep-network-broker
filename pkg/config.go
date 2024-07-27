@@ -443,21 +443,9 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// Commits
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
 			// Branches
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// File content
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/:filepath").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -492,6 +480,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				// get contents of file
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/:filepath").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Commits
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
