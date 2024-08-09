@@ -394,6 +394,11 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			})
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app/installations/:id/access_tokens").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			})
 
 		if config.Inbound.GitHub.AllowCodeAccess {
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
