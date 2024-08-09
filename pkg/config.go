@@ -393,7 +393,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				URL:               gitHubBaseUrl.JoinPath("/app").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
-			})
+			},
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/app/installations/:id/access_tokens").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
