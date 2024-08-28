@@ -364,9 +364,9 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// check repo installation for an org
+			// check repos for an org
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation/repositories").String(),
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/repos").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
