@@ -18,6 +18,7 @@ import (
 var configFiles []string
 var jsonLog bool
 var deploymentId int
+var brokerIndex int
 
 var rootCmd = &cobra.Command{
 	Use:     "semgrep-network-broker",
@@ -39,7 +40,7 @@ var rootCmd = &cobra.Command{
 		}()
 
 		// load config(s)
-		config, err := pkg.LoadConfig(configFiles, deploymentId)
+		config, err := pkg.LoadConfig(configFiles, deploymentId, brokerIndex)
 		if err != nil {
 			log.Panic(err)
 		}
@@ -75,7 +76,7 @@ func StartNetworkBroker(config *pkg.Config) (func() error, error) {
 		return wireguardTeardown()
 	}
 
-	// start inbound proxy (r2c --> customer)
+	// start inbound proxy (semgrep --> customer)
 	if err := config.Inbound.Start(tnet); err != nil {
 		teardown()
 		return nil, fmt.Errorf("failed to start inbound proxy: %v", err)
@@ -95,4 +96,5 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVarP(&configFiles, "config", "c", nil, "config file(s)")
 	rootCmd.PersistentFlags().BoolVarP(&jsonLog, "json-log", "j", false, "JSON log output")
 	rootCmd.PersistentFlags().IntVarP(&deploymentId, "deployment-id", "d", 0, "Semgrep deployment ID")
+	rootCmd.PersistentFlags().IntVarP(&brokerIndex, "broker-index", "i", 0, "Semgrep network broker index")
 }
