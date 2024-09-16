@@ -14,34 +14,34 @@ import (
 
 var pubkeyCmd = &cobra.Command{
 	Use:   "pubkey",
-	Short: "Reads a base64 private key from stdin, outputs the corresponding base64 public key",
+	Short: "Reads a Semgrep Network Broker private key from stdin and ptints the corresponding public key to stdout.",
 	Run: func(cmd *cobra.Command, args []string) {
-		keyBase64, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			log.Panic(err)
-		}
 
-		keyBytes := make([]byte, defaultKeyCount*device.NoisePrivateKeySize)
-		n, err := base64.StdEncoding.Decode(keyBytes, keyBase64)
-		if err != nil {
-			log.Panic(err)
-		}
-		if n%device.NoisePrivateKeySize != 0 {
-			log.Panicf("invalid byte length: %v", n)
-		}
+		decoder := base64.NewDecoder(base64.StdEncoding, os.Stdin)
+		encoder := base64.NewEncoder(base64.StdEncoding, os.Stdout)
+		defer encoder.Close()
 
-		result := make([]byte, 0, n)
+		privateKeyBytes := make([]byte, device.NoisePrivateKeySize)
 
-		for i := 0; i < n; i += device.NoisePrivateKeySize {
-			privateKey, err := wgtypes.NewKey(keyBytes[i : i+device.NoisePrivateKeySize])
+		for i := 0; ; i++ {
+			_, err := io.ReadFull(decoder, privateKeyBytes)
 			if err != nil {
-				log.Panic(err)
+				if err == io.EOF {
+					break
+				} else {
+					log.Panic(fmt.Errorf("error reading private key %v: %v", i, err))
+				}
 			}
-			publicKey := privateKey.PublicKey()
-			result = append(result, publicKey[:]...)
-		}
+			privateKey, err := wgtypes.NewKey(privateKeyBytes)
+			if err != nil {
+				log.Panic(fmt.Errorf("error creating private key %v: %v", i, err))
+			}
 
-		fmt.Println(base64.StdEncoding.EncodeToString(result))
+			publicKey := privateKey.PublicKey()
+			if _, err := encoder.Write(publicKey[:]); err != nil {
+				log.Panic(fmt.Errorf("error writing public key %v: %v", i, err))
+			}
+		}
 	},
 }
 

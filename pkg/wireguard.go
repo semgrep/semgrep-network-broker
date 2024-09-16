@@ -48,7 +48,9 @@ func (base WireguardBase) Validate() error {
 func (base WireguardBase) GenerateConfig() string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(base.PrivateKey[device.NoisePrivateKeySize*base.BrokerIndex:device.NoisePrivateKeySize*(base.BrokerIndex+1)])))
+	indexedPrivateKey := base.PrivateKey[device.NoisePrivateKeySize*base.BrokerIndex : device.NoisePrivateKeySize*(base.BrokerIndex+1)]
+
+	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(indexedPrivateKey)))
 	sb.WriteString(fmt.Sprintf("listen_port=%d\n", base.ListenPort))
 
 	for i := range base.Peers {

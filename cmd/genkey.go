@@ -3,40 +3,43 @@ package cmd
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-var keyCount int
+var replicaCount int
 
-const defaultKeyCount = 3
+const defaultReplicaCount = 3
+const minReplicaCount = 1
+const maxReplicaCount = 16
 
 var genkeyCmd = &cobra.Command{
 	Use:   "genkey",
-	Short: "Generates a random private key in base64 and prints it to stdout",
+	Short: "Generates a random Semgrep Network Broker private key and prints it to stdout.",
 	Run: func(cmd *cobra.Command, args []string) {
-		if keyCount < 1 {
-			log.Panic("--key-count must be greater than zero")
+		if replicaCount < minReplicaCount || replicaCount > maxReplicaCount {
+			log.Panic(fmt.Errorf("replica count must be between %v and %v", minReplicaCount, maxReplicaCount))
 		}
 
-		result := make([]byte, 0, device.NoisePrivateKeySize*keyCount)
+		encoder := base64.NewEncoder(base64.StdEncoding, os.Stdout)
+		defer encoder.Close()
 
-		for i := 0; i < keyCount; i++ {
+		for i := 0; i < replicaCount; i++ {
 			privateKey, err := wgtypes.GeneratePrivateKey()
 			if err != nil {
-				log.Panic(fmt.Errorf("failed to generate private key: %v", err))
+				log.Panic(fmt.Errorf("failed to generate private key %v: %v", i, err))
 			}
-			result = append(result[:], privateKey[:]...)
+			if _, err := encoder.Write(privateKey[:]); err != nil {
+				log.Panic(fmt.Errorf("failed to write private key %v: %v", i, err))
+			}
 		}
-
-		fmt.Println(base64.StdEncoding.EncodeToString(result))
 	},
 }
 
 func init() {
-	genkeyCmd.PersistentFlags().IntVarP(&keyCount, "key-count", "k", defaultKeyCount, "Number of keys to generate")
+	genkeyCmd.PersistentFlags().IntVarP(&replicaCount, "replica-count", "r", defaultReplicaCount, "Number of broker replicas to support")
 	rootCmd.AddCommand(genkeyCmd)
 }
