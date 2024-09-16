@@ -125,13 +125,20 @@ inbound:
 
 Under the hood, this config adds these allowlist items:
 
+- DELETE `https://gitlab.example.com/api/v4/groups/:namespace/hooks/:hook`
+- DELETE `https://gitlab.example.com/api/v4/projects/:project/hooks/:hook`
+- GET `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
 - GET `https://gitlab.example.com/api/v4/namespaces/:namespace`
 - GET `https://gitlab.example.com/api/v4/projects/:project`
+- GET `https://gitlab.example.com/api/v4/projects/:project/members/all/:user`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
+- GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji`
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
 - GET `https://gitlab.example.com/api/v4/:entity_type/:namespace/projects`
+- POST `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
+- POST `https://gitlab.example.com/api/v4/projects/:project/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
@@ -141,6 +148,8 @@ And if `allowCodeAccess` is set, additionally:
 
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/files/:filepath`
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/commits`
+- GET `https://gitlab.example.com/api/v4/projects/:project/repository/compare`
+- POST `https://gitlab.example.com/api/v4/projects/:project/statuses/:commit`
 
 ### Bitbucket
 

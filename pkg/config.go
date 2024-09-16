@@ -436,6 +436,17 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// Group webhooks
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks/:hook").String(),
+				Methods:           ParseHttpMethods([]string{"DELETE"}),
+				SetRequestHeaders: headers,
+			},
 			// Group info
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/namespaces/:namespace").String(),
@@ -445,6 +456,23 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			// repo info
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Repo webhooks
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks/:hook").String(),
+				Methods:           ParseHttpMethods([]string{"DELETE"}),
+				SetRequestHeaders: headers,
+			},
+			// Get a repo member
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/members/all/:user").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -496,6 +524,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"PUT"}),
 				SetRequestHeaders: headers,
 			},
+			// Get reactions to comments
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 		)
 
 		if config.Inbound.GitLab.AllowCodeAccess {
@@ -509,6 +543,18 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				// Commits
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Compare branches
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/compare").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// Update commit status
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
