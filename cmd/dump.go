@@ -13,7 +13,7 @@ var dumpCmd = &cobra.Command{
 	Use:   "dump",
 	Short: "Dump current config",
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := pkg.LoadConfig(configFiles, deploymentId)
+		config, err := pkg.LoadConfig(configFiles, deploymentId, brokerIndex)
 		if err != nil {
 			log.Panic(err)
 		}
