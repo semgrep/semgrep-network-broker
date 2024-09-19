@@ -63,6 +63,47 @@ func (base WireguardBase) GenerateConfig() string {
 	return sb.String()
 }
 
+func (base *WireguardBase) resolveBrokerIndex() (int, error) {
+	var re *regexp.Regexp
+	var err error
+	if base.BrokerIndexHostnameRegex != "" {
+		re, err = regexp.Compile(base.BrokerIndexHostnameRegex)
+		if err != nil {
+			return 0, fmt.Errorf("failed to compile BrokerIndexHostnameRegex: %v", err)
+		}
+	}
+
+	// Priority 1: check for broker index override
+	if base.brokerIndexOverride >= 0 {
+		return base.brokerIndexOverride, nil
+	}
+
+	// Priority 2: try parsing index from hostname, if regex is set
+	if re != nil {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get hostname: %v", err)
+		}
+
+		matches := re.FindStringSubmatch(hostname)
+		if matches != nil {
+			if len(matches) < 2 {
+				return 0, fmt.Errorf("regexp must return atleast one capture group: %v", base.BrokerIndexHostnameRegex)
+			}
+
+			parsedIndex, err := strconv.ParseInt(matches[1], 10, 16)
+			if err != nil {
+				return 0, fmt.Errorf("error parsing capture group (%v): %v", matches[1], err)
+			}
+
+			return int(parsedIndex), nil
+		}
+	}
+
+	// Priority 3: use config value
+	return base.BrokerIndex, nil
+}
+
 func (base *WireguardBase) ResolveConfig() error {
 	resolvedLocalAddress, err := netip.ParseAddr(base.LocalAddress)
 	if err != nil {
@@ -73,33 +114,11 @@ func (base *WireguardBase) ResolveConfig() error {
 	}
 	base.resolvedLocalAddress = resolvedLocalAddress
 
-	if base.BrokerIndexHostnameRegex != "" {
-		re, err := regexp.Compile(base.BrokerIndexHostnameRegex)
-		if err != nil {
-			return fmt.Errorf("failed to compile BrokerIndexHostnameRegex: %v", err)
-		}
-
-		hostname, err := os.Hostname()
-		if err != nil {
-			return fmt.Errorf("failed to get hostname: %v", err)
-		}
-
-		matches := re.FindStringSubmatch(hostname)
-		if matches == nil {
-			return fmt.Errorf("hostname %v did not match regexp: %v", hostname, base.BrokerIndexHostnameRegex)
-		} else if len(matches) < 2 {
-			return fmt.Errorf("")
-		}
-
-		parsedIndex, err := strconv.ParseInt(matches[1], 10, 16)
-		if err != nil {
-			return fmt.Errorf("error parsing capture group (%v): %v", matches[1], err)
-		}
-
-		base.resolvedBrokerIndex = base.BrokerIndex + int(parsedIndex)
-	} else {
-		base.resolvedBrokerIndex = base.BrokerIndex
+	brokerIndex, err := base.resolveBrokerIndex()
+	if err != nil {
+		return fmt.Errorf("failed to resolve broker index: %v", err)
 	}
+	base.resolvedBrokerIndex = brokerIndex
 
 	for i := range base.Peers {
 		if base.Peers[i].Endpoint == "" {
