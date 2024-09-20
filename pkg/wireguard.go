@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
@@ -75,6 +76,7 @@ func (base *WireguardBase) resolveBrokerIndex() (int, error) {
 
 	// Priority 1: check for broker index override
 	if base.brokerIndexOverride >= 0 {
+		log.WithField("source", "override").WithField("value", base.brokerIndexOverride).Debug("broker_index.resolved")
 		return base.brokerIndexOverride, nil
 	}
 
@@ -86,21 +88,23 @@ func (base *WireguardBase) resolveBrokerIndex() (int, error) {
 		}
 
 		matches := re.FindStringSubmatch(hostname)
-		if matches != nil {
+		if len(matches) > 0 {
 			if len(matches) < 2 {
 				return 0, fmt.Errorf("regexp must return atleast one capture group: %v", base.BrokerIndexHostnameRegex)
 			}
 
-			parsedIndex, err := strconv.ParseInt(matches[1], 10, 16)
+			parsedIndex, err := strconv.Atoi(matches[1])
 			if err != nil {
 				return 0, fmt.Errorf("error parsing capture group (%v): %v", matches[1], err)
 			}
 
-			return int(parsedIndex), nil
+			log.WithField("source", "hostname").WithField("value", parsedIndex).Debug("broker_index.resolved")
+			return parsedIndex, nil
 		}
 	}
 
 	// Priority 3: use config value
+	log.WithField("source", "config").WithField("value", base.BrokerIndex).Debug("broker_index.resolved")
 	return base.BrokerIndex, nil
 }
 
