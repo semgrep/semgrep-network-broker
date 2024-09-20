@@ -8,8 +8,12 @@ import (
 	"math/rand"
 	"net"
 	"net/netip"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun/netstack"
@@ -38,7 +42,7 @@ func (peer WireguardPeer) WriteTo(sb io.StringWriter) {
 func (base WireguardBase) Validate() error {
 	privateKeyCount := len(base.PrivateKey) / device.NoisePrivateKeySize
 
-	if base.BrokerIndex >= privateKeyCount {
+	if base.resolvedBrokerIndex >= privateKeyCount {
 		return errors.New("broker index beyond private key count")
 	}
 
@@ -48,7 +52,7 @@ func (base WireguardBase) Validate() error {
 func (base WireguardBase) GenerateConfig() string {
 	sb := strings.Builder{}
 
-	indexedPrivateKey := base.PrivateKey[device.NoisePrivateKeySize*base.BrokerIndex : device.NoisePrivateKeySize*(base.BrokerIndex+1)]
+	indexedPrivateKey := base.PrivateKey[device.NoisePrivateKeySize*base.resolvedBrokerIndex : device.NoisePrivateKeySize*(base.resolvedBrokerIndex+1)]
 
 	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(indexedPrivateKey)))
 	sb.WriteString(fmt.Sprintf("listen_port=%d\n", base.ListenPort))
@@ -60,15 +64,65 @@ func (base WireguardBase) GenerateConfig() string {
 	return sb.String()
 }
 
+func (base *WireguardBase) resolveBrokerIndex() (int, error) {
+	var re *regexp.Regexp
+	var err error
+	if base.BrokerIndexHostnameRegex != "" {
+		re, err = regexp.Compile(base.BrokerIndexHostnameRegex)
+		if err != nil {
+			return 0, fmt.Errorf("failed to compile BrokerIndexHostnameRegex: %v", err)
+		}
+	}
+
+	// Priority 1: check for broker index override
+	if base.brokerIndexOverride >= 0 {
+		log.WithField("source", "override").WithField("value", base.brokerIndexOverride).Debug("broker_index.resolved")
+		return base.brokerIndexOverride, nil
+	}
+
+	// Priority 2: try parsing index from hostname, if regex is set
+	if re != nil {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get hostname: %v", err)
+		}
+
+		matches := re.FindStringSubmatch(hostname)
+		if len(matches) > 0 {
+			if len(matches) < 2 {
+				return 0, fmt.Errorf("regexp must return atleast one capture group: %v", base.BrokerIndexHostnameRegex)
+			}
+
+			parsedIndex, err := strconv.Atoi(matches[1])
+			if err != nil {
+				return 0, fmt.Errorf("error parsing capture group (%v): %v", matches[1], err)
+			}
+
+			log.WithField("source", "hostname").WithField("value", parsedIndex).Debug("broker_index.resolved")
+			return parsedIndex, nil
+		}
+	}
+
+	// Priority 3: use config value
+	log.WithField("source", "config").WithField("value", base.BrokerIndex).Debug("broker_index.resolved")
+	return base.BrokerIndex, nil
+}
+
 func (base *WireguardBase) ResolveConfig() error {
 	resolvedLocalAddress, err := netip.ParseAddr(base.LocalAddress)
 	if err != nil {
 		return fmt.Errorf("LocalAddress parse failed: %v", err)
 	}
-	for i := 0; i < base.BrokerIndex; i++ {
+	for i := 0; i < base.resolvedBrokerIndex; i++ {
 		resolvedLocalAddress = resolvedLocalAddress.Next()
 	}
 	base.resolvedLocalAddress = resolvedLocalAddress
+
+	brokerIndex, err := base.resolveBrokerIndex()
+	if err != nil {
+		return fmt.Errorf("failed to resolve broker index: %v", err)
+	}
+	base.resolvedBrokerIndex = brokerIndex
 
 	for i := range base.Peers {
 		if base.Peers[i].Endpoint == "" {

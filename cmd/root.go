@@ -96,5 +96,5 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVarP(&configFiles, "config", "c", nil, "config file(s)")
 	rootCmd.PersistentFlags().BoolVarP(&jsonLog, "json-log", "j", false, "JSON log output")
 	rootCmd.PersistentFlags().IntVarP(&deploymentId, "deployment-id", "d", 0, "Semgrep deployment ID")
-	rootCmd.PersistentFlags().IntVarP(&brokerIndex, "broker-index", "i", 0, "Semgrep network broker index")
+	rootCmd.PersistentFlags().IntVarP(&brokerIndex, "broker-index", "i", -1, "Semgrep network broker index override (-1 to disable)")
 }
