@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"reflect"
@@ -73,15 +72,13 @@ type WireguardPeer struct {
 }
 
 type WireguardBase struct {
-	resolvedLocalAddress netip.Addr
-	LocalAddress         string                `mapstructure:"localAddress" json:"localAddress" validate:"format=ip"`
-	Dns                  []string              `mapstructure:"dns" json:"dns" validate:"empty=true > format=ip"`
-	Mtu                  int                   `mapstructure:"mtu" json:"mtu" validate:"gte=0" default:"1420"`
-	PrivateKey           SensitiveBase64String `mapstructure:"privateKey" json:"privateKey" validate:"empty=false"`
-	ListenPort           int                   `mapstructure:"listenPort" json:"listenPort" validate:"gte=0"`
-	Peers                []WireguardPeer       `mapstructure:"peers" json:"peers" validate:"empty=false"`
-	Verbose              bool                  `mapstructure:"verbose" json:"verbose"`
-	BrokerIndex          int                   `mapstructure:"brokerIndex" json:"brokerIndex" validate:"gte=0"`
+	LocalAddress string                `mapstructure:"localAddress" json:"localAddress" validate:"format=ip"`
+	Dns          []string              `mapstructure:"dns" json:"dns" validate:"empty=true > format=ip"`
+	Mtu          int                   `mapstructure:"mtu" json:"mtu" validate:"gte=0" default:"1420"`
+	PrivateKey   SensitiveBase64String `mapstructure:"privateKey" json:"privateKey" validate:"empty=false"`
+	ListenPort   int                   `mapstructure:"listenPort" json:"listenPort" validate:"gte=0"`
+	Peers        []WireguardPeer       `mapstructure:"peers" json:"peers" validate:"empty=false"`
+	Verbose      bool                  `mapstructure:"verbose" json:"verbose"`
 }
 
 type BitTester interface {
@@ -265,10 +262,8 @@ type Config struct {
 	Outbound OutboundProxyConfig `mapstructure:"outbound" json:"outbound"`
 }
 
-func LoadConfig(configFiles []string, deploymentId int, brokerIndex int) (*Config, error) {
+func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	config := new(Config)
-
-	config.Inbound.Wireguard.BrokerIndex = brokerIndex
 
 	if deploymentId > 0 {
 		hostname := os.Getenv("SEMGREP_HOSTNAME")

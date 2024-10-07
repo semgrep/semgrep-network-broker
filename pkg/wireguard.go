@@ -2,7 +2,6 @@ package pkg
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -35,22 +34,10 @@ func (peer WireguardPeer) WriteTo(sb io.StringWriter) {
 	}
 }
 
-func (base WireguardBase) Validate() error {
-	privateKeyCount := len(base.PrivateKey) / device.NoisePrivateKeySize
-
-	if base.BrokerIndex >= privateKeyCount {
-		return errors.New("broker index beyond private key count")
-	}
-
-	return nil
-}
-
 func (base WireguardBase) GenerateConfig() string {
 	sb := strings.Builder{}
 
-	indexedPrivateKey := base.PrivateKey[device.NoisePrivateKeySize*base.BrokerIndex : device.NoisePrivateKeySize*(base.BrokerIndex+1)]
-
-	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(indexedPrivateKey)))
+	sb.WriteString(fmt.Sprintf("private_key=%s\n", hex.EncodeToString(base.PrivateKey)))
 	sb.WriteString(fmt.Sprintf("listen_port=%d\n", base.ListenPort))
 
 	for i := range base.Peers {
@@ -60,16 +47,7 @@ func (base WireguardBase) GenerateConfig() string {
 	return sb.String()
 }
 
-func (base *WireguardBase) ResolveConfig() error {
-	resolvedLocalAddress, err := netip.ParseAddr(base.LocalAddress)
-	if err != nil {
-		return fmt.Errorf("LocalAddress parse failed: %v", err)
-	}
-	for i := 0; i < base.BrokerIndex; i++ {
-		resolvedLocalAddress = resolvedLocalAddress.Next()
-	}
-	base.resolvedLocalAddress = resolvedLocalAddress
-
+func (base *WireguardBase) ResolvePeerEndpoints() error {
 	for i := range base.Peers {
 		if base.Peers[i].Endpoint == "" {
 			continue
@@ -99,10 +77,13 @@ func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
 		return nil, nil, fmt.Errorf("invalid wireguard config: %v", err)
 	}
 
-	// resolve local address and peer endpoints (if not IP address already)
-	if err := config.ResolveConfig(); err != nil {
+	// resolve peer endpoints (if not IP address already)
+	if err := config.ResolvePeerEndpoints(); err != nil {
 		return nil, nil, fmt.Errorf("failed to resolve peer endpoint: %v", err)
 	}
+
+	// parse localAddres and DNS addresses -- MustParseAddr is fine here because we've already validated the config
+	localAddress := netip.MustParseAddr(config.LocalAddress)
 
 	var dnsAddresses = make([]netip.Addr, len(config.Dns))
 	for i := range config.Dns {
@@ -111,7 +92,7 @@ func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
 
 	// create the wireguard interface
 	tun, tnet, err := netstack.CreateNetTUN(
-		[]netip.Addr{config.resolvedLocalAddress},
+		[]netip.Addr{localAddress},
 		dnsAddresses,
 		config.Mtu,
 	)

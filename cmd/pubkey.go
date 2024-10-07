@@ -8,40 +8,35 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 var pubkeyCmd = &cobra.Command{
 	Use:   "pubkey",
-	Short: "Reads a Semgrep Network Broker private key from stdin and ptints the corresponding public key to stdout.",
+	Short: "Reads a base64 private key from stdin, outputs the corresponding base64 public key",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		decoder := base64.NewDecoder(base64.StdEncoding, os.Stdin)
-		encoder := base64.NewEncoder(base64.StdEncoding, os.Stdout)
-		defer encoder.Close()
-
-		privateKeyBytes := make([]byte, device.NoisePrivateKeySize)
-
-		for i := 0; ; i++ {
-			_, err := io.ReadFull(decoder, privateKeyBytes)
-			if err != nil {
-				if err == io.EOF {
-					break
-				} else {
-					log.Panic(fmt.Errorf("error reading private key %v: %v", i, err))
-				}
-			}
-			privateKey, err := wgtypes.NewKey(privateKeyBytes)
-			if err != nil {
-				log.Panic(fmt.Errorf("error creating private key %v: %v", i, err))
-			}
-
-			publicKey := privateKey.PublicKey()
-			if _, err := encoder.Write(publicKey[:]); err != nil {
-				log.Panic(fmt.Errorf("error writing public key %v: %v", i, err))
-			}
+		keyBase64, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			log.Panic(err)
 		}
+
+		keyBytes := make([]byte, 32)
+		n, err := base64.StdEncoding.Decode(keyBytes, keyBase64)
+		if err != nil {
+			log.Panic(err)
+		}
+		if n != 32 {
+			log.Panic("not enough bytes")
+		}
+
+		privateKey, err := wgtypes.NewKey(keyBytes)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		publicKey := privateKey.PublicKey()
+
+		fmt.Println(base64.StdEncoding.EncodeToString(publicKey[:]))
 	},
 }
 
