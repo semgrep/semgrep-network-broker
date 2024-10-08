@@ -9,3 +9,11 @@ repos:
     rev: v0.5.0
     hooks:
       - id: go-fmt
+  - repo: local
+    hooks:
+      - id: generate-protos
+        name: generate protos
+        language: system
+        pass_filenames: false
+        types: [proto]
+        entry: make protos

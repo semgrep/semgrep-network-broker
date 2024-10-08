@@ -82,12 +82,20 @@ func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
 		return nil, nil, fmt.Errorf("failed to resolve peer endpoint: %v", err)
 	}
 
-	// parse localAddres and DNS addresses -- MustParseAddr is fine here because we've already validated the config
-	localAddress := netip.MustParseAddr(config.LocalAddress)
+	// parse localAddress
+	localAddress, err := netip.ParseAddr(config.LocalAddress)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse local address \"%v\": %v", config.LocalAddress, err)
+	}
 
+	// parse DNS addresses
 	var dnsAddresses = make([]netip.Addr, len(config.Dns))
 	for i := range config.Dns {
-		dnsAddresses[i] = netip.MustParseAddr(config.Dns[i])
+		dnsAddress, err := netip.ParseAddr(config.Dns[i])
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse dns address \"%v\": %v", dnsAddress, config.Dns[i])
+		}
+		dnsAddresses[i] = dnsAddress
 	}
 
 	// create the wireguard interface
