@@ -11,11 +11,71 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-go@v3
         with:
           go-version-file: 'go.mod'
           cache: true
-      - run: make deps test
+      - id: get-buf-version
+        run: |
+          echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
+          github_token: ${{ github.token }}
+      - run: |
+          make test
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Setup buf for proto stuff
+      - id: get-buf-version
+        run: |
+          echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
+          github_token: ${{ github.token }}
+
+      - name: Run pre-commit hooks
+        uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: --all-files --verbose
+
+  proto-check:
+    name: Verify generated Protobuf output is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: get-buf-version
+        run: |
+          echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
+          github_token: ${{ github.token }}
+      - name: Run generation script
+        run: make protos
+      - name: Fail if there is a diff. If you fail this run `make protos`
+        run: git diff --exit-code
+
+  proto-compat:
+    name: Check Protobuf backwards compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: get-buf-version
+        run: |
+          echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
+          github_token: ${{ github.token }}
+      - uses: bufbuild/buf-breaking-action@v1
+        with:
+          against: "https://github.com/${GITHUB_REPOSITORY}.git#branch=develop"

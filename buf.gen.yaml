@@ -1,0 +1,4 @@
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/go:v1.35.1
+    out: protos

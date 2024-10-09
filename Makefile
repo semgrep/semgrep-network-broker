@@ -3,11 +3,16 @@ BUILDTIME := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 VERSION := local-development
 REVISION := $(shell git rev-parse HEAD)
 
+.PHONY: deps docker test clean protos
+.DEFAULT_GOAL := test
 
 deps:
 	go mod download
 
-build: deps
+protos: broker.proto
+	buf generate
+
+build: deps protos
 	go build -o bin/$(BINARY_NAME) -ldflags="-X 'github.com/semgrep/semgrep-network-broker/build.BuildTime=$(BUILDTIME)' -X 'github.com/semgrep/semgrep-network-broker/build.Version=$(VERSION)' -X 'github.com/semgrep/semgrep-network-broker/build.Revision=$(REVISION)'"
 
 docker:

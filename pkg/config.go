@@ -265,6 +265,21 @@ type Config struct {
 func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	config := new(Config)
 
+	tokenString, err := LoadTokenFromEnv()
+	if err != nil {
+		return config, fmt.Errorf("failed to load token: %v", err)
+	}
+
+	if tokenString != "" {
+		token, err := ParseBrokerToken(tokenString)
+		if err != nil {
+			return config, fmt.Errorf("failed to parse token: %v", err)
+		}
+
+		config.Inbound.Wireguard.LocalAddress = token.WireguardCredential.LocalAddress
+		config.Inbound.Wireguard.PrivateKey = token.WireguardCredential.PrivateKey
+	}
+
 	if deploymentId > 0 {
 		hostname := os.Getenv("SEMGREP_HOSTNAME")
 		if hostname == "" {
