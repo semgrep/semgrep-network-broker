@@ -806,7 +806,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				},
 				// checkout repo
 				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/scm/:project/:repo.git/*").String(),
+					URL:               bitBucketBaseUrl.JoinPath("/scm/:project/:repo/*").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
