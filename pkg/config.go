@@ -804,8 +804,13 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
+				// checkout repo
+				AllowlistItem{
+					URL:               bitBucketBaseUrl.JoinPath("/scm/:project/:repo/*").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
 			)
-
 		}
 	}
 
