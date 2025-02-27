@@ -534,6 +534,61 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
 				SetRequestHeaders: headers,
 			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/installation").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app/hook/config").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/check-runs").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/check-runs/:check_run_id").String(),
+				Methods:           ParseHttpMethods([]string{"PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams/:team_slug/members").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/members").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/users/:username").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id").String(),
+				Methods:           ParseHttpMethods([]string{"DELETE", "PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/statuses/:commit").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
 		)
 
 		if config.Inbound.GitHub.AllowCodeAccess {
