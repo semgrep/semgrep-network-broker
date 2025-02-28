@@ -203,8 +203,8 @@ Under the hood, this config adds these allowlist items:
 And if `allowCodeAccess` is set, additionally:
 
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/browse/*`
+- GET `https://bitbucket.example.com/rest/api/latest//scm/:project/:repo/*`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/commit/:commit/builds`
-
 
 ### AzureDevops
 
