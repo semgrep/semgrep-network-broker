@@ -206,7 +206,7 @@ And if `allowCodeAccess` is set, additionally:
 - GET `https://bitbucket.example.com/rest/api/latest//scm/:project/:repo/*`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/commit/:commit/builds`
 
-### AzureDevops
+### Azure DevOps
 
 Similarly, the `azuredevops` configuration section grants Semgrep access to azure devops.
 
