@@ -104,12 +104,23 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/api/v3/app`
 - GET `https://github.example.com/api/v3/repos/:org/:repo/actions/secrets/public-key`
 - GET `https://github.example.com/api/v3/repos/:org/:repo/contents/.github/workflows/semgrep.yml`
+- GET `https://github.example.com/api/v3/repos/:org/:repo/installation`
+- GET `https://github.example.com/api/v3/app/hook/config`
+- GET `https://github.example.com/api/v3/orgs/:org/teams`
+- GET `https://github.example.com/api/v3/orgs/:org/teams/:team_slug/members`
+- GET `https://github.example.com/api/v3/orgs/:org/members`
+- GET `https://github.example.com/api/v3/users/:username`
 - PUT `https://github.example.com/api/v3/repos/:org/:repo/contents/.github/workflows/semgrep.yml`
 - PUT `https://github.example.com/api/v3/repos/:org/:repo/actions/secrets/SEMGREP_APP_TOKEN`
 - POST `https://github.example.com/api/v3/app/installations/:id/access_tokens`
 - POST `https://github.example.com/api/v3/app-manifests/:code/conversions`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
+- POST `https://github.example.com/api/v3/repos/:org/:repo/check-runs`
+- POST `https://github.example.com/api/v3/repos/:org/:repo/statuses/:commit`
+- PATCH `https://github.example.com/api/v3/repos/:org/:repo/check-runs/:check_run_id`
+- PATCH `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
+- DELETE `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
 
 And if `allowCodeAccess` is set, additionally:
 
@@ -192,10 +203,10 @@ Under the hood, this config adds these allowlist items:
 And if `allowCodeAccess` is set, additionally:
 
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/browse/*`
+- GET `https://bitbucket.example.com/rest/api/latest//scm/:project/:repo/*`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/commit/:commit/builds`
 
-
-### AzureDevops
+### Azure DevOps
 
 Similarly, the `azuredevops` configuration section grants Semgrep access to azure devops.
 
