@@ -454,6 +454,16 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/user").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/user/repos").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// PR info
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
@@ -464,6 +474,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// get PR comment reactions
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id/reactions").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			// post issue comment
@@ -555,6 +571,21 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/compare/:basehead").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id").String(),
+				Methods:           ParseHttpMethods([]string{"PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id/replies").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
@@ -576,7 +607,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			},
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
@@ -593,6 +624,11 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 
 		if config.Inbound.GitHub.AllowCodeAccess {
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/contents").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
 				// get contents of file
 				AllowlistItem{
 					URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/contents/*").String(),
