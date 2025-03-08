@@ -445,7 +445,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse github base URL without api suffix: %v", err)
 		}
-		
+
 		var headers map[string]string
 		if gitHub.Token != "" {
 			headers = map[string]string{
