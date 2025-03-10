@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -99,6 +98,13 @@ func extractUrlsFromAllowlist(allowlist pkg.Allowlist, baseURL *url.URL) ([]urlI
 	return urls, nil
 }
 
+const (
+	GitHubProvider      = "Github"
+	GitLabProvider      = "Gitlab"
+	BitbucketProvider   = "Bitbucket"
+	AzureDevOpsProvider = "AzureDevOps"
+)
+
 func main() {
 	readmePath := "README.md"
 	content, err := os.ReadFile(readmePath)
@@ -113,10 +119,10 @@ func main() {
 		exampleBaseURL string
 		config         *pkg.Config
 	}{
-		{"Github", "https://github.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{}}}},
-		{"Gitlab", "https://gitlab.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{}}}},
-		{"Bitbucket", "https://bitbucket.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{}}}},
-		{"AzureDevOps", "https://dev.azure.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{}}}},
+		{GitHubProvider, "https://github.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{}}}},
+		{GitLabProvider, "https://gitlab.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{}}}},
+		{BitbucketProvider, "https://bitbucket.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{}}}},
+		{AzureDevOpsProvider, "https://dev.azure.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{}}}},
 	}
 
 	// Populate the allowlists for each provider
@@ -140,8 +146,18 @@ func main() {
 		sortUrls(urlsNotRequiringCodeAccess)
 		updates[p.name] = urlsNotRequiringCodeAccess
 
-		if provider := reflect.ValueOf(p.config.Inbound).FieldByName(p.name); provider.IsValid() {
-			provider.Elem().FieldByName("AllowCodeAccess").SetBool(true)
+		switch p.name {
+		case GitHubProvider:
+			p.config.Inbound.GitHub.AllowCodeAccess = true
+		case GitLabProvider:
+			p.config.Inbound.GitLab.AllowCodeAccess = true
+		case BitbucketProvider:
+			p.config.Inbound.BitBucket.AllowCodeAccess = true
+		case AzureDevOpsProvider:
+			p.config.Inbound.AzureDevOps.AllowCodeAccess = true
+		default:
+			fmt.Fprintf(os.Stderr, "unhandled provider %s\n", p.name)
+			os.Exit(1)
 		}
 
 		if err := pkg.PopulateAllowLists(p.config); err != nil {
