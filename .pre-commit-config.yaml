@@ -17,3 +17,10 @@ repos:
         pass_filenames: false
         types: [proto]
         entry: make protos
+  - repo: local
+    hooks:
+      - id: readme-url-populator
+        name: readme url populator
+        entry: cd tools/readme-url-populator && go run main.go
+        language: system
+        pass_filenames: false
