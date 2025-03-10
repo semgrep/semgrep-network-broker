@@ -24,6 +24,26 @@ type urlInfo struct {
 	URL    string
 }
 
+// Order URLs by HTTP method, then path for consistent output
+func sortUrls(urls []urlInfo) {
+	methodOrder := map[string]int{
+		"GET":    0,
+		"POST":   1,
+		"PUT":    2,
+		"PATCH":  3,
+		"DELETE": 4,
+	}
+
+	sort.Slice(urls, func(i, j int) bool {
+		iOrder := methodOrder[urls[i].Method]
+		jOrder := methodOrder[urls[j].Method]
+		if iOrder != jOrder {
+			return iOrder < jOrder
+		}
+		return urls[i].URL < urls[j].URL
+	})
+}
+
 // Create a set type for our URL/method pairs
 type urlMethodSet map[string]struct{}
 
@@ -76,17 +96,6 @@ func extractUrlsFromAllowlist(allowlist pkg.Allowlist, baseURL *url.URL) ([]urlI
 		}
 	}
 
-	// Sort URLs by HTTP method, then path for consistent output
-	sort.Slice(urls, func(i, j int) bool {
-		methodOrder := "GET,POST,PUT,PATCH,DELETE"
-		iIndex := strings.Index(methodOrder, urls[i].Method)
-		jIndex := strings.Index(methodOrder, urls[j].Method)
-		if iIndex != jIndex {
-			return iIndex < jIndex
-		}
-		return urls[i].URL < urls[j].URL
-	})
-
 	return urls, nil
 }
 
@@ -112,7 +121,6 @@ func main() {
 
 	// Populate the allowlists for each provider
 	for _, p := range providers {
-
 		baseURL, err := url.Parse(p.exampleBaseURL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to parse baseURL for %s: %v\n", p.name, err)
@@ -124,13 +132,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Populate with URLs which do not require code access
-		standardUrls, err := extractUrlsFromAllowlist(p.config.Inbound.Allowlist, baseURL)
+		urlsNotRequiringCodeAccess, err := extractUrlsFromAllowlist(p.config.Inbound.Allowlist, baseURL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to extract URLs for %s: %v\n", p.name, err)
 			os.Exit(1)
 		}
-		updates[p.name] = standardUrls
+		sortUrls(urlsNotRequiringCodeAccess)
+		updates[p.name] = urlsNotRequiringCodeAccess
 
 		if provider := reflect.ValueOf(p.config.Inbound).FieldByName(p.name); provider.IsValid() {
 			provider.Elem().FieldByName("AllowCodeAccess").SetBool(true)
@@ -141,14 +149,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		urlsIncludingOnesRequiringCodeAccess, err := extractUrlsFromAllowlist(p.config.Inbound.Allowlist, baseURL)
+		allUrls, err := extractUrlsFromAllowlist(p.config.Inbound.Allowlist, baseURL)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to extract URLs for %s.AllowCodeAccess: %v\n", p.name, err)
 			os.Exit(1)
 		}
 
-		// Populate exclusively with URLs requiring code access
-		updates[p.name+".AllowCodeAccess"] = subtract(makeSet(urlsIncludingOnesRequiringCodeAccess), makeSet(standardUrls))
+		urlsRequiringCodeAccess := subtract(makeSet(allUrls), makeSet(urlsNotRequiringCodeAccess))
+		sortUrls(urlsRequiringCodeAccess)
+		updates[p.name+".AllowCodeAccess"] = urlsRequiringCodeAccess
 	}
 
 	var buf bytes.Buffer
