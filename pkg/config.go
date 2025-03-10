@@ -441,9 +441,9 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
 		// which requests resources which don't have an api suffix, e.g. /api/v3/
 		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
-		githubBaseUrlWithoutApiSuffix, err := url.Parse(strings.TrimSuffix(gitHub.BaseURL, "/api/v3"))
+		githubRootUrl, err := url.Parse(gitHubBaseUrl.Scheme + "://" + gitHubBaseUrl.Host)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse github base URL without api suffix: %v", err)
+			return nil, fmt.Errorf("failed to build github root URL: %v", err)
 		}
 
 		var headers map[string]string
@@ -651,13 +651,13 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 				},
 				// discover refs
 				AllowlistItem{
-					URL:               githubBaseUrlWithoutApiSuffix.JoinPath("/:org/:repo/info/refs").String(),
+					URL:               githubRootUrl.JoinPath("/:org/:repo/info/refs").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// download repo contents
 				AllowlistItem{
-					URL:               githubBaseUrlWithoutApiSuffix.JoinPath("/:org/:repo/git-upload-pack").String(),
+					URL:               githubRootUrl.JoinPath("/:org/:repo/git-upload-pack").String(),
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
