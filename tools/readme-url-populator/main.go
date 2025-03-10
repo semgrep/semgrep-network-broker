@@ -91,7 +91,7 @@ func extractUrlsFromAllowlist(allowlist pkg.Allowlist, baseURL *url.URL) ([]urlI
 }
 
 func main() {
-	readmePath := "../../README.md"
+	readmePath := "README.md"
 	content, err := os.ReadFile(readmePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading README.md: %v\n", err)
