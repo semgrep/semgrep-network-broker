@@ -430,20 +430,12 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	// Step 5: Apply default values to any remaining unset config fields
 	defaults.SetDefaults(config)
 
-	if err := PopulateAllowLists(config); err != nil {
-		return nil, fmt.Errorf("failed to populate allowlists: %v", err)
-	}
-
-	return config, nil
-}
-
-func PopulateAllowLists(config *Config) error {
 	if config.Inbound.GitHub != nil {
 		gitHub := config.Inbound.GitHub
 
 		gitHubBaseUrl, err := url.Parse(gitHub.BaseURL)
 		if err != nil {
-			return fmt.Errorf("failed to parse github base URL: %v", err)
+			return nil, fmt.Errorf("failed to parse github base URL: %v", err)
 		}
 
 		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
@@ -678,7 +670,7 @@ func PopulateAllowLists(config *Config) error {
 
 		gitLabBaseUrl, err := url.Parse(gitLab.BaseURL)
 		if err != nil {
-			return fmt.Errorf("failed to parse gitlab base URL: %v", err)
+			return nil, fmt.Errorf("failed to parse gitlab base URL: %v", err)
 		}
 
 		var headers map[string]string
@@ -835,7 +827,7 @@ func PopulateAllowLists(config *Config) error {
 		bitBucketBaseUrl, err := url.Parse(bitBucket.BaseURL)
 
 		if err != nil {
-			return fmt.Errorf("failed to parse bitbucket base URL: %v", err)
+			return nil, fmt.Errorf("failed to parse bitbucket base URL: %v", err)
 		}
 
 		var headers map[string]string
@@ -938,13 +930,13 @@ func PopulateAllowLists(config *Config) error {
 
 		azureDevOpsBaseUrl, err := url.Parse(azureDevOps.BaseURL)
 		if err != nil {
-			return fmt.Errorf("failed to parse azure devops base URL: %v", err)
+			return nil, fmt.Errorf("failed to parse azure devops base URL: %v", err)
 		}
 
 		vsaexBaseUrl := strings.Replace(azureDevOps.BaseURL, "dev.azure.com", "vsaex.dev.azure.com", 1)
 		vsaexUrl, err := url.Parse(vsaexBaseUrl)
 		if err != nil {
-			return fmt.Errorf("failed to parse azure devops vsaex base URL: %v", err)
+			return nil, fmt.Errorf("failed to parse azure devops vsaex base URL: %v", err)
 		}
 
 		var headers map[string]string
@@ -1042,5 +1034,5 @@ func PopulateAllowLists(config *Config) error {
 		}
 	}
 
-	return nil
+	return config, nil
 }

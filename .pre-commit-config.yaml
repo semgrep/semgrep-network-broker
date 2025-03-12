@@ -17,11 +17,3 @@ repos:
         pass_filenames: false
         types: [proto]
         entry: make protos
-  - repo: local
-    hooks:
-      - id: readme-url-populator
-        name: readme url populator
-        entry: bash -c 'go run tools/readme-url-populator/main.go'
-        language: system
-        always_run: true
-        files: ^README\.md$
