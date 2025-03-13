@@ -105,6 +105,13 @@ const (
 	AzureDevOpsProvider = "AzureDevOps"
 )
 
+const (
+	GitHubExampleBaseURL      = "https://github.example.com"
+	GitLabExampleBaseURL      = "https://gitlab.example.com"
+	BitbucketExampleBaseURL   = "https://bitbucket.example.com"
+	AzureDevOpsExampleBaseURL = "https://dev.azure.com"
+)
+
 func main() {
 	readmePath := "README.md"
 	content, err := os.ReadFile(readmePath)
@@ -119,10 +126,10 @@ func main() {
 		exampleBaseURL string
 		config         *pkg.Config
 	}{
-		{GitHubProvider, "https://github.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{BaseURL: "https://github.example.com"}}}},
-		{GitLabProvider, "https://gitlab.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{BaseURL: "https://gitlab.example.com"}}}},
-		{BitbucketProvider, "https://bitbucket.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{BaseURL: "https://bitbucket.example.com"}}}},
-		{AzureDevOpsProvider, "https://dev.azure.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{BaseURL: "https://dev.azure.com"}}}},
+		{GitHubProvider, GitHubExampleBaseURL, &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{BaseURL: GitHubExampleBaseURL}}}},
+		{GitLabProvider, GitLabExampleBaseURL, &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{BaseURL: GitLabExampleBaseURL}}}},
+		{BitbucketProvider, BitbucketExampleBaseURL, &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{BaseURL: BitbucketExampleBaseURL}}}},
+		{AzureDevOpsProvider, AzureDevOpsExampleBaseURL, &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{BaseURL: AzureDevOpsExampleBaseURL}}}},
 	}
 
 	// Populate the allowlists for each provider
