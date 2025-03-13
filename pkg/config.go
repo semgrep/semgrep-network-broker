@@ -451,7 +451,7 @@ func PopulateAllowLists(config *Config) error {
 		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
 		githubRootUrl, err := url.Parse(gitHubBaseUrl.Scheme + "://" + gitHubBaseUrl.Host)
 		if err != nil {
-			return nil, fmt.Errorf("failed to build github root URL: %v", err)
+			return fmt.Errorf("failed to build github root URL: %v", err)
 		}
 
 		var headers map[string]string

@@ -89,7 +89,7 @@ func extractUrlsFromAllowlist(allowlist pkg.Allowlist, baseURL *url.URL) ([]urlI
 			if item.Methods.Test(m.bit) {
 				urls = append(urls, urlInfo{
 					Method: m.name,
-					URL:    baseURL.JoinPath(item.URL).String(),
+					URL:    item.URL,
 				})
 			}
 		}
@@ -109,7 +109,7 @@ func main() {
 	readmePath := "README.md"
 	content, err := os.ReadFile(readmePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading README.md: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error reading README.md: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -119,22 +119,22 @@ func main() {
 		exampleBaseURL string
 		config         *pkg.Config
 	}{
-		{GitHubProvider, "https://github.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{}}}},
-		{GitLabProvider, "https://gitlab.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{}}}},
-		{BitbucketProvider, "https://bitbucket.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{}}}},
-		{AzureDevOpsProvider, "https://dev.azure.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{}}}},
+		{GitHubProvider, "https://github.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitHub: &pkg.GitHub{BaseURL: "https://github.example.com"}}}},
+		{GitLabProvider, "https://gitlab.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{GitLab: &pkg.GitLab{BaseURL: "https://gitlab.example.com"}}}},
+		{BitbucketProvider, "https://bitbucket.example.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{BitBucket: &pkg.BitBucket{BaseURL: "https://bitbucket.example.com"}}}},
+		{AzureDevOpsProvider, "https://dev.azure.com", &pkg.Config{Inbound: pkg.InboundProxyConfig{AzureDevOps: &pkg.AzureDevOps{BaseURL: "https://dev.azure.com"}}}},
 	}
 
 	// Populate the allowlists for each provider
 	for _, p := range providers {
 		baseURL, err := url.Parse(p.exampleBaseURL)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to parse baseURL for %s: %v\n", p.name, err)
+			fmt.Fprintf(os.Stderr, "failed to parse baseURL for %s: %v\n", p.name, err)
 			os.Exit(1)
 		}
 
 		if err := pkg.PopulateAllowLists(p.config); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to populate allowlists for %s: %v\n", p.name, err)
+			fmt.Fprintf(os.Stderr, "failed to populate allowlists for %s: %v\n", p.name, err)
 			os.Exit(1)
 		}
 
