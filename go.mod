@@ -1,7 +1,6 @@
 module github.com/semgrep/semgrep-network-broker
 
 go 1.21
-
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/gin-gonic/gin v1.10.0
@@ -16,7 +15,7 @@ require (
 	github.com/whuang8/redactrus v1.0.2
 	golang.zx2c4.com/wireguard v0.0.0-20231010133717-42ec952eadc2
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 
