@@ -235,7 +235,7 @@ Similarly, the `azuredevops` configuration section grants Semgrep access to azur
 
 ```yaml
 inbound:
-  bitbucket:
+  azureDevOps:
     baseUrl: https://example@dev.azure.com/
     token: ...
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
