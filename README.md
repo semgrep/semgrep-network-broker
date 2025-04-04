@@ -105,6 +105,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/orgs/:org/teams`
 - GET `https://github.example.com/orgs/:org/teams/:team_slug/members`
 - GET `https://github.example.com/repos/:org/:repo/actions/secrets/public-key`
+- GET `https://github.example.com/repos/:org/:repo/collaborators/:username/permission`
 - GET `https://github.example.com/repos/:org/:repo/compare/:basehead`
 - GET `https://github.example.com/repos/:org/:repo/contents/.github/workflows/semgrep.yml`
 - GET `https://github.example.com/repos/:org/:repo/installation`
