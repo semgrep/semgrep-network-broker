@@ -245,6 +245,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo`
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests`
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations`
+- GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations/:iterationId/changes`
 - GET `https://dev.azure.com/:namespace/:project/_apis/hooks/subscriptions`
 - GET `https://dev.azure.com/:namespace/_apis/connectionData`
 - GET `https://dev.azure.com/:namespace/_apis/projects/:project`

@@ -998,6 +998,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// get pull request iteration changes
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations/:iterationId/changes").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post and update PR comment
 			AllowlistItem{
 				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads").String(),
