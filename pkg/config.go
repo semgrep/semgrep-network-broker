@@ -853,6 +853,12 @@ func PopulateAllowLists(config *Config) error {
 		}
 
 		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+			// version information and other application properties
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/application-properties").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// project info
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project").String(),
@@ -899,6 +905,17 @@ func PopulateAllowLists(config *Config) error {
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/blocker-comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// repository webhooks
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks/:webhook").String(),
+				Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
 				SetRequestHeaders: headers,
 			},
 			// namespace webhooks
