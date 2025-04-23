@@ -106,9 +106,9 @@ const (
 )
 
 const (
-	GitHubExampleBaseURL      = "https://github.example.com"
-	GitLabExampleBaseURL      = "https://gitlab.example.com"
-	BitbucketExampleBaseURL   = "https://bitbucket.example.com"
+	GitHubExampleBaseURL      = "https://github.example.com/api/v3"
+	GitLabExampleBaseURL      = "https://gitlab.example.com/api/v4"
+	BitbucketExampleBaseURL   = "https://bitbucket.example.com/rest/api/latest"
 	AzureDevOpsExampleBaseURL = "https://dev.azure.com"
 )
 
