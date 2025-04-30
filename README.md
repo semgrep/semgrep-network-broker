@@ -94,6 +94,8 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/api/v3/app`
 - GET `https://github.example.com/api/v3/app/hook/config`
 - GET `https://github.example.com/api/v3/installation/repositories`
+- GET `https://github.example.com/api/v3/organizations`
+- GET `https://github.example.com/api/v3/orgs/:org`
 - GET `https://github.example.com/api/v3/orgs/:org/hooks`
 - GET `https://github.example.com/api/v3/orgs/:org/installation`
 - GET `https://github.example.com/api/v3/orgs/:org/members`
@@ -108,6 +110,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/api/v3/repos/:owner/:repo`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/comments/:comment_id/reactions`
+- GET `https://github.example.com/api/v3/repos/:repo/branches`
 - GET `https://github.example.com/api/v3/user`
 - GET `https://github.example.com/api/v3/user/repos`
 - GET `https://github.example.com/api/v3/users/:user/installation`
