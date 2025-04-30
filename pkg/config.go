@@ -498,10 +498,28 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// list branches
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:repo/branches").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post issue comment
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// list organizations
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/organizations").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// get an organization
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			// check app installation for an org
