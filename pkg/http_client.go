@@ -42,9 +42,16 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 				return nil, fmt.Errorf("failed to add CA cert to pool: %v", hcc.AdditionalCACerts[i])
 			}
 		}
+		minVersion := tls.VersionTLS13
+		switch hcc.MinVersion {
+		case "1.2":
+			minVersion = tls.VersionTLS12
+		case "1.3":
+			minVersion = tls.VersionTLS13
+		}
 		transport.TLSClientConfig = &tls.Config{
 			ClientCAs:  certPool,
-			MinVersion: tls.VersionTLS13,
+			MinVersion: minVersion,
 		}
 	}
 
