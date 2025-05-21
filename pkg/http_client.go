@@ -43,7 +43,7 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 			}
 		}
 		minVersion := tls.VersionTLS13
-		switch hcc.MinVersion {
+		switch hcc.TlsMinVersion {
 		case "1.2":
 			minVersion = tls.VersionTLS12
 		case "1.3":
