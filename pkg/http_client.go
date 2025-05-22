@@ -48,6 +48,10 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 			minVersion = uint16(tls.VersionTLS12)
 		case "1.3":
 			minVersion = uint16(tls.VersionTLS13)
+		default:
+			if hcc.TlsMinVersion != "" {
+				return nil, fmt.Errorf("invalid tlsMinVersion: %q. tlsMinVersion must be '1.2' or '1.3' — older TLS versions are not supported", hcc.TlsMinVersion)
+			}
 		}
 		transport.TLSClientConfig = &tls.Config{
 			ClientCAs:  certPool,
