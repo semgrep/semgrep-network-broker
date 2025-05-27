@@ -31,15 +31,18 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 		if err != nil {
 			return nil, err
 		}
+		if certPool == nil {
+			return nil, fmt.Errorf("failed to get system cert pool. Adding additional CA certs is not possible")
+		} else {
+			for i := range hcc.AdditionalCACerts {
+				caCert, err := os.ReadFile(hcc.AdditionalCACerts[i])
+				if err != nil {
+					return nil, fmt.Errorf("failed to add CA cert to pool: %v", err)
+				}
 
-		for i := range hcc.AdditionalCACerts {
-			caCert, err := os.ReadFile(hcc.AdditionalCACerts[i])
-			if err != nil {
-				return nil, fmt.Errorf("failed to add CA cert to pool: %v", err)
-			}
-
-			if ok := certPool.AppendCertsFromPEM(caCert); !ok {
-				return nil, fmt.Errorf("failed to add CA cert to pool: %v", hcc.AdditionalCACerts[i])
+				if ok := certPool.AppendCertsFromPEM(caCert); !ok {
+					return nil, fmt.Errorf("failed to add CA cert to pool: %v", hcc.AdditionalCACerts[i])
+				}
 			}
 		}
 		minVersion := uint16(tls.VersionTLS13)
