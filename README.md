@@ -72,6 +72,7 @@ inbound:
   httpClient:
     additionalCACerts:
       - /path/to/custom/cert.pem
+    tlsMinVersion: "1.2" # Optional. Valid values: "1.2", "1.3". Defaults to "1.3" if unset.
 ```
 
 ### GitHub

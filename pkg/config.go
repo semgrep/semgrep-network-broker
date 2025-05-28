@@ -245,6 +245,7 @@ type AzureDevOps struct {
 
 type HttpClientConfig struct {
 	AdditionalCACerts []string `mapstructure:"additionalCACerts" json:"additionalCACerts"`
+	TlsMinVersion     string   `mapstructure:"tlsMinVersion" json:"tlsMinVersion" validate:"one_of=1.2,1.3" default:"1.3"`
 }
 
 type InboundProxyConfig struct {
