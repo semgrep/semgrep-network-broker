@@ -26,6 +26,8 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
+	var certPool *x509.CertPool // nil certPool == use default system certs
+
 	if len(hcc.AdditionalCACerts) > 0 {
 		certPool, err := x509.SystemCertPool()
 		if err != nil {
@@ -42,21 +44,21 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 				return nil, fmt.Errorf("failed to add CA cert to pool: %v", hcc.AdditionalCACerts[i])
 			}
 		}
-		minVersion := uint16(tls.VersionTLS13)
-		switch hcc.TlsMinVersion {
-		case "1.2":
-			minVersion = uint16(tls.VersionTLS12)
-		case "1.3":
-			minVersion = uint16(tls.VersionTLS13)
-		default:
-			if hcc.TlsMinVersion != "" {
-				return nil, fmt.Errorf("invalid tlsMinVersion: %q. tlsMinVersion must be '1.2' or '1.3' — older TLS versions are not supported", hcc.TlsMinVersion)
-			}
-		}
-		transport.TLSClientConfig = &tls.Config{
-			RootCAs:    certPool,
-			MinVersion: minVersion,
-		}
+	}
+
+	var minVersion uint16
+	switch hcc.TlsMinVersion {
+	case "1.2":
+		minVersion = uint16(tls.VersionTLS12)
+	case "1.3":
+	case "":
+		minVersion = uint16(tls.VersionTLS13)
+	default:
+		return nil, fmt.Errorf("invalid tlsMinVersion: %q. tlsMinVersion must be '1.2' or '1.3' — older TLS versions are not supported", hcc.TlsMinVersion)
+	}
+	transport.TLSClientConfig = &tls.Config{
+		RootCAs:    certPool,
+		MinVersion: minVersion,
 	}
 
 	return transport, nil
