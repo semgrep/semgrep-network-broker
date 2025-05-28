@@ -70,7 +70,7 @@ Example:
 ```yaml
 inbound:
   httpClient:
-    additionalCACerts: # Optional, useful if you have self-signed certificates. Certificates here will be appended to the Root CA trust of the container.
+    additionalCACerts: # Optional. Certificates here will be appended to the Root CA trust of the container. Necessary when the SCM(s) the broker interacts with have self-signed certificates.
       - /path/to/custom/cert.pem
     tlsMinVersion: "1.2" # Optional. Valid values: "1.2", "1.3". Defaults to "1.3" if unset.
 ```
@@ -80,10 +80,10 @@ An alternative to stipulating `additionalCACerts:` is setting the `$SSL_CERT_DIR
 Example:
 
 ```bash
-docker run \
+$ docker run \
   ...
-  -v /path/containing/your/certs:/certs \
-  -e SSL_CERT_DIR=/certs \
+  -v /path/containing/your/certs:/certs \ # mount a path from the host machine as a container volume
+  -e SSL_CERT_DIR=/certs \ # set the $SSL_CERT_DIR environment variable to the mounted volume
   ...
   -it semgrep-network-broker:latest -c /emt/config.yaml
 ```
