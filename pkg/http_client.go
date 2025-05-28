@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
@@ -28,6 +30,7 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 
 	if len(hcc.AdditionalCACerts) > 0 {
 		certPool, err := x509.SystemCertPool()
+		log.WithField("message", "Adding additional CA Certs").Info("httpClient.config")
 		if err != nil {
 			return nil, err
 		}
@@ -57,7 +60,7 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 			}
 		}
 		transport.TLSClientConfig = &tls.Config{
-			ClientCAs:  certPool,
+			RootCAs:    certPool,
 			MinVersion: minVersion,
 		}
 	}
