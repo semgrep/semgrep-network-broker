@@ -43,7 +43,7 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 			}
 		}
 		transport.TLSClientConfig = &tls.Config{
-			ClientCAs:  certPool,
+			RootCAs:    certPool,
 			MinVersion: tls.VersionTLS13,
 		}
 	}
