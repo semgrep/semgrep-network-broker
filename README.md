@@ -70,10 +70,25 @@ Example:
 ```yaml
 inbound:
   httpClient:
-    additionalCACerts:
+    additionalCACerts: # Optional, useful if you have self-signed certificates. Certificates here will be appended to the Root CA trust of the container.
       - /path/to/custom/cert.pem
     tlsMinVersion: "1.2" # Optional. Valid values: "1.2", "1.3". Defaults to "1.3" if unset.
 ```
+
+An alternative to stipulating `additionalCACerts:` is setting the `$SSL_CERT_DIR` environment variable at time of container creation.
+
+Example:
+
+```bash
+docker run \
+  ...
+  -v /path/containing/your/certs:/certs \
+  -e SSL_CERT_DIR=/certs \
+  ...
+  -it semgrep-network-broker:latest -c /emt/config.yaml
+```
+
+Refer to the [network broker docs on semgrep.dev](https://semgrep.dev/docs/semgrep-ci/network-broker) for more detail on docker setup.
 
 ### GitHub
 
@@ -412,7 +427,9 @@ outbound:
       equals:
         - bar
       additionalConfigs:
-        - destinationUrl: htttps://example.com/fallback
+        - destinationUrl: https://example.com/fallback
 ```
 
 The example above would relay traffic to https://httpbin.org/anything if the request body contains `{"foo": "bar"}`, otherwise, it'd relay traffic to `htttps://example.com/fallback`.
+
+For other questions or feedback, join us on the [Semgrep Community Slack](https://go.semgrep.dev/slack).
