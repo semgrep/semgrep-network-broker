@@ -140,6 +140,7 @@ Under the hood, this config adds these allowlist items:
 - POST `https://github.example.com/api/v3/repos/:org/:repo/statuses/:commit`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
+- PATCH `https://github.example.com/api/v3/repos/:org/:repo/pulls/comments/:comment_id`
 - PUT `https://github.example.com/api/v3/repos/:org/:repo/actions/secrets/SEMGREP_APP_TOKEN`
 - PUT `https://github.example.com/api/v3/repos/:org/:repo/contents/.github/workflows/semgrep.yml`
 - PATCH `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
