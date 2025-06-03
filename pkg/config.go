@@ -15,8 +15,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/mcuadros/go-defaults"
-	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 

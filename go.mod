@@ -7,8 +7,8 @@ toolchain go1.24.1
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/gin-gonic/gin v1.10.0
+	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/mcuadros/go-defaults v1.2.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
@@ -37,7 +37,6 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.20.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
