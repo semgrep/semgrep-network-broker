@@ -366,9 +366,8 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			return nil, fmt.Errorf("failed to merge config file '%s': %v", configFiles[i], err)
 		}
 	}
-	if err := viper.Unmarshal(config, func(dc *mapstructure.DecoderConfig) {
-		dc.DecodeHook = mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook)
-	}); err != nil {
+	if err := viper.Unmarshal(config, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook))); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
