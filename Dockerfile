@@ -15,7 +15,7 @@ COPY . ./
 
 RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/semgrep/semgrep-network-broker/build.BuildTime=${BUILDTIME}' -X 'github.com/semgrep/semgrep-network-broker/build.Version=${VERSION}' -X 'github.com/semgrep/semgrep-network-broker/build.Revision=${REVISION}'"
 
-FROM alpine:3.19.1
+FROM alpine:3.22
 
 RUN adduser -D semgrep
 USER semgrep
