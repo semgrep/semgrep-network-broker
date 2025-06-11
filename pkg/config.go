@@ -500,7 +500,7 @@ func PopulateAllowLists(config *Config) error {
 			},
 			// list branches
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:repo/branches").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -620,7 +620,7 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id/replies").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id/replies").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
