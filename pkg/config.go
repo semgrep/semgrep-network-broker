@@ -615,6 +615,11 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id").String(),
+				Methods:           ParseHttpMethods([]string{"PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id/replies").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
