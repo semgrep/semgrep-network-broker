@@ -580,12 +580,12 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/contents/.github/workflows/semgrep.yml").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/.github/workflows/semgrep.yml").String(),
 				Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/installation").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/installation").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -595,32 +595,32 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/check-runs").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/check-runs/:check_run_id").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs/:check_run_id").String(),
 				Methods:           ParseHttpMethods([]string{"PATCH"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/compare/:basehead").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/compare/:basehead").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id").String(),
 				Methods:           ParseHttpMethods([]string{"PATCH"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id").String(),
 				Methods:           ParseHttpMethods([]string{"PATCH"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id/replies").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
@@ -655,12 +655,12 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/statuses/:commit").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/statuses/:commit").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/collaborators/:username/permission").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/collaborators/:username/permission").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -669,31 +669,31 @@ func PopulateAllowLists(config *Config) error {
 		if config.Inbound.GitHub.AllowCodeAccess {
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
 				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/contents").String(),
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// get contents of file
 				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/contents/*").String(),
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/*").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// Commits
 				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/commits").String(),
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/commits").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// discover refs
 				AllowlistItem{
-					URL:               githubRootUrl.JoinPath("/:org/:repo/info/refs").String(),
+					URL:               githubRootUrl.JoinPath("/:owner/:repo/info/refs").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// download repo contents
 				AllowlistItem{
-					URL:               githubRootUrl.JoinPath("/:org/:repo/git-upload-pack").String(),
+					URL:               githubRootUrl.JoinPath("/:owner/:repo/git-upload-pack").String(),
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
