@@ -126,7 +126,7 @@ Under the hood, this config adds these allowlist items:
 - GET `https://github.example.com/api/v3/repos/:owner/:repo`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/branches`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
-- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments/:comment_id/reactions`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/comments/:comment_id/reactions`
 - GET `https://github.example.com/api/v3/user`
 - GET `https://github.example.com/api/v3/user/repos`
 - GET `https://github.example.com/api/v3/users/:user/installation`

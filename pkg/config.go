@@ -494,7 +494,7 @@ func PopulateAllowLists(config *Config) error {
 			},
 			// get PR comment reactions
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id/reactions").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id/reactions").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
