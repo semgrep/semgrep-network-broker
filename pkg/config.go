@@ -494,13 +494,13 @@ func PopulateAllowLists(config *Config) error {
 			},
 			// get PR comment reactions
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id/reactions").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id/reactions").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			// list branches
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:repo/branches").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
@@ -615,12 +615,7 @@ func PopulateAllowLists(config *Config) error {
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id").String(),
-				Methods:           ParseHttpMethods([]string{"PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/comments/:comment_id/replies").String(),
+				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/pulls/:number/comments/:comment_id/replies").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
