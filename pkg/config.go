@@ -730,6 +730,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"DELETE"}),
 				SetRequestHeaders: headers,
 			},
+			// List all members of a group
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/members/all").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// Namespace info
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/namespaces/:namespace").String(),
