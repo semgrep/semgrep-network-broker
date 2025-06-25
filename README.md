@@ -85,7 +85,7 @@ echo YOUR_PRIVATE_KEY | sudo docker run -i ghcr.io/semgrep/semgrep-network-broke
 The Semgrep backend needs your public key to connect to the broker. Your public key is shared in the Broker settings page of your Semgrep organization. 
 1. Log in to Semgrep AppSec Platform.
 2. Navigate to Settings > Broker.
-3. Paste your public key and click `Add Public Key`.
+3. Paste your public key `YOUR_PUBLIC_KEY` into the field and click `Add Public Key`.
 
 ### Configure the Broker YAML Config File
 
