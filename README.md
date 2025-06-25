@@ -102,15 +102,17 @@ inbound:
 ```
 
 1. YOUR_PRIVATE_KEY: input the wireguard private key [generated earlier](README.md#key-generation).
-Do this once per type of Source Code Manager (SCM). If using multiple versions of the same SCM, [refer here](README.md#configure-access-to-multiple-scms).
 2. SCM_NAME: input the name of your private network resource. Refer to the table below.
 3. SCM_URL: input the URL of your private network resource. Refer to the table below. 
+4. SCM_SECRET: *Optional. Do not include unless you have a special use case requiring it. These tokens are typically one-to-many SCMs and are managed in the Semgrep UI.
+
+> **NOTE: if you have multiple SCM's of different or same type [refer here](README.md#configure-access-to-multiple-scms).
 
 #### Accepted SCM Config Values
 | Source Code Manager | SCM_NAME | SCM_URL | SCM_SECRET |
 | ------------- | -------------| ------------- | ------------- |
 | GitLab Server  |  gitlab   | `https://<GITLAB_BASE_URL>/api/v4` | Group Access Token with [`api`](https://semgrep.dev/docs/deployment/connect-scm#connect-to-on-premise-orgs-and-projects) and [`read_repository`](https://semgrep.dev/docs/semgrep-appsec-platform/scm-code-access#required-scm-code-access-scopes) scope |
-| GitHub Enterprise Server | github | `https://<GITHUB_BASE_URL>/api/v3`   | Not Applicable | 
+| GitHub Enterprise Server | github | `https://<GITHUB_BASE_URL>/api/v3`   | Personal Access Token | 
 | BitBucket DataCenter <v7.17.x | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
 | BitBucket DataCenter >=v7.18.x. | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [HTTP Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
 | Azure DevOps Server | azuredevops | `https://<ADO_BASE_URL>/*` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/azure#prerequisites-and-permissions) with `Full access` | 
