@@ -77,7 +77,7 @@ docker run --rm ghcr.io/semgrep/semgrep-network-broker:latest genkey
 
 2. Generate your public key `YOUR_PUBLIC_KEY`:
 ```bash
-echo YOUR_PRIVATE_KEY | sudo docker run -i ghcr.io/semgrep/semgrep-network-broker:VERSION_NUMBER pubkey
+echo YOUR_PRIVATE_KEY | docker run --rm -i ghcr.io/semgrep/semgrep-network-broker:latest pubkey
 ```
 > Your public key is safe to share.
 
