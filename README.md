@@ -104,7 +104,7 @@ inbound:
 1. YOUR_PRIVATE_KEY: input the wireguard private key [generated earlier](README.md#key-generation).
 2. SCM_NAME: input the name of your private network resource. Refer to the table below.
 3. SCM_URL: input the URL of your private network resource. Refer to the table below. 
-4. SCM_SECRET: *Optional. Do not include unless you have a special use case requiring it. These tokens are typically many-to-one SCM and are managed in the Semgrep UI.
+4. SCM_SECRET: *Optional. Do not include `token: <SMC_SECRET>` unless you have a special use case requiring it. These tokens are typically many-to-one SCM and are managed in the Semgrep UI not in this config file. 
 
 > **NOTE:** if you have multiple SCM's of different or same type [refer here](README.md#configure-access-to-multiple-scms).
 
