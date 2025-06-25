@@ -14,14 +14,14 @@ Examples of inbound traffic include:
 
 ## Feature Availability
 
-The Semgrep Network Broker is a feature that must be enabled in your Semgrep organization (org) before setup. 
+The Semgrep Network Broker is a feature that must be enabled in your Semgrep organization (org) before setup.
 It is only available to paying customers.
 > Contact the [Semgrep support team](https://semgrep.dev/docs/support) to discuss having it enabled for your organization.
 If you will be using the broker with a dedicated Semgrep tenant, please note that in your request.
 
 ## Deployment
 
-The network broker can be run as a bare Docker container, in a Kubernetes cluster, or simply as a standalone binary on a machine. 
+The network broker can be run as a bare Docker container, in a Kubernetes cluster, or simply as a standalone binary on a machine.
 
 Only one instance of the wireguard-based broker can be run concurrently. Multiple brokers with the same configuration can cause disconnects, instability, and package loss.
 
@@ -31,7 +31,7 @@ Only one instance of the wireguard-based broker can be run concurrently. Multipl
 
 ### Network Requirements
 - Between Semgrep and Broker:
-  - Allow traffic from `wireguard.semgrep.dev` on UDP port 51820. If on a dedicated Semgrep tenant, allow traffic from `wireguard.<tenant-name>.semgrep.dev` instead. 
+  - Allow traffic from `wireguard.semgrep.dev` on UDP port 51820. If on a dedicated Semgrep tenant, allow traffic from `wireguard.<tenant-name>.semgrep.dev` instead.
   - If using the `--deployment-id` CLI flag, allow outbound to `semgrep.dev` on TCP port 443 for HTTPS.
 - Between Broker and each private network resource:
   - Enable outbound on TCP ports 80 and 443 for HTTP/HTTPS communication.
@@ -39,7 +39,7 @@ Only one instance of the wireguard-based broker can be run concurrently. Multipl
 > **NOTE** To determine the IP addresses for a domain, use dig. The addresses are listed under the ANSWER section. Example: `dig wireguard.semgrep.dev`
 
 ### Artifacts
-You can choose between deploying pre-made artifacts or building your own. 
+You can choose between deploying pre-made artifacts or building your own.
 #### Pre-built by Semgrep
 - Docker images are available from [ghcr.io/semgrep/semgrep-network-broker](https://github.com/semgrep/semgrep-network-broker/pkgs/container/semgrep-network-broker).
 - A simple [Kubernetes Manifest](kubernetes.yaml) is present within the repository. This should be extended for production.
@@ -52,9 +52,9 @@ You can choose between deploying pre-made artifacts or building your own.
 
 ## Configuration
 
-The network broker requires configuration in two locations:  
-1. The broker settings page in your Semgrep AppSec Platform organization. 
-2. A YAML file passed to the broker at execution. 
+The network broker requires configuration in two locations:
+1. The broker settings page in your Semgrep AppSec Platform organization.
+2. A YAML file passed to the broker at execution.
 
 The configuration examples below assume you are using a published network broker docker image.
 
@@ -69,20 +69,20 @@ To retrieve your organization ID `ORGANIZATION_ID`, go to your Semgrep organizat
 
 The broker requires a Wireguard keypair in order to establish a secure connection.
 
-1. Generate your private key `YOUR_PRIVATE_KEY`: 
+1. Generate your private key `YOUR_PRIVATE_KEY`:
 ```bash
 docker run ghcr.io/semgrep/semgrep-network-broker:VERSION_TAG genkey
 ```
 > _Do not_ share your private key with anyone (including Semgrep).
 
-2. Generate your public key `YOUR_PUBLIC_KEY`: 
+2. Generate your public key `YOUR_PUBLIC_KEY`:
 ```bash
 echo YOUR_PRIVATE_KEY | sudo docker run -i ghcr.io/semgrep/semgrep-network-broker:VERSION_NUMBER pubkey
 ```
-> Your public key is safe to share. 
+> Your public key is safe to share.
 
 ### Configure the Broker Settings Page
-The Semgrep backend needs your public key to connect to the broker. Your public key is shared in the Broker settings page of your Semgrep organization. 
+The Semgrep backend needs your public key to connect to the broker. Your public key is shared in the Broker settings page of your Semgrep organization.
 1. Log in to Semgrep AppSec Platform.
 2. Navigate to Settings > Broker.
 3. Paste your public key `YOUR_PUBLIC_KEY` into the field and click `Add Public Key`.
@@ -98,13 +98,13 @@ inbound:
   <SCM_NAME>:
     baseUrl: <SCM_URL>
     token: <SCM_SECRET>
-    allowCodeAccess: true   
+    allowCodeAccess: true
 ```
 
 1. YOUR_PRIVATE_KEY: input the wireguard private key [generated earlier](README.md#key-generation).
 2. SCM_NAME: input the name of your private network resource. Refer to the table below.
-3. SCM_URL: input the URL of your private network resource. Refer to the table below. 
-4. SCM_SECRET: *Optional. Do not include `token: <SMC_SECRET>` unless you have a special use case requiring it. These tokens are typically many-to-one SCM and are managed in the Semgrep UI not in this config file. 
+3. SCM_URL: input the URL of your private network resource. Refer to the table below.
+4. SCM_SECRET: *Optional. Do not include `token: <SMC_SECRET>` unless you have a special use case requiring it. These tokens are typically many-to-one SCM and are managed in the Semgrep UI not in this config file.
 
 > **NOTE:** if you have multiple SCMs of different or same type [refer here](README.md#configure-access-to-multiple-scms).
 
@@ -112,10 +112,10 @@ inbound:
 | Source Code Manager | SCM_NAME | SCM_URL | SCM_SECRET |
 | ------------- | -------------| ------------- | ------------- |
 | GitLab Server  |  gitlab   | `https://<GITLAB_BASE_URL>/api/v4` | Group Access Token with [`api`](https://semgrep.dev/docs/deployment/connect-scm#connect-to-on-premise-orgs-and-projects) and [`read_repository`](https://semgrep.dev/docs/semgrep-appsec-platform/scm-code-access#required-scm-code-access-scopes) scope |
-| GitHub Enterprise Server | github | `https://<GITHUB_BASE_URL>/api/v3`   | Personal Access Token | 
+| GitHub Enterprise Server | github | `https://<GITHUB_BASE_URL>/api/v3`   | Personal Access Token |
 | BitBucket DataCenter <v7.17.x | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
 | BitBucket DataCenter >=v7.18.x. | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [HTTP Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
-| Azure DevOps Server | azuredevops | `https://<ADO_BASE_URL>/*` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/azure#prerequisites-and-permissions) with `Full access` | 
+| Azure DevOps Server | azuredevops | `https://<ADO_BASE_URL>/*` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/azure#prerequisites-and-permissions) with `Full access` |
 
 > **NOTE**: the SCM_Secret scopes/permissions listed are for setups allowing Semgrep access to Source Code. Downgrade the permissions if your setup does not require code access. For downgraded scopes, refer to the linked documentation.
 
@@ -126,15 +126,15 @@ Config file(s) are passed to the broker with the flag `-c <PATH_TO_CONFIG>`:
 Multiple config files can be overlaid on top of each other by passing multiple `-c` args (ex. `semgrep-network-broker -c config1.yaml -c config2.yaml -c config3.yaml`). Note that while maps will be merged together, arrays will be _replaced_.
 
 ### Pulling Additional Default Configuration with DEPLOYMENT_ID
-On top of your local config file, the broker will need to pull additional configuration information from the Semgrep platform. 
+On top of your local config file, the broker will need to pull additional configuration information from the Semgrep platform.
 
 This is done with the flag `-d <ORGANIZATION_ID>` using the Semgrep Organization ID [retrieved earlier](README.md#semgrep-organization-id).
 
 ### Running the Broker
-Here is the recommended default command to run the broker. 
-- It uses a published broker docker image. 
+Here is the recommended default command to run the broker.
+- It uses a published broker docker image.
 - The config file is assumed to be located at `./config.yaml`.
-- It uses your `ORGANIZATION_ID` to pull the default config from Semgrep.  
+- It uses your `ORGANIZATION_ID` to pull the default config from Semgrep.
 ```
 docker run --rm-it -v ./config.yaml:/emt/config.yaml ghcr.io/semgrep/semgrep-network-broker:v0.34.0 -c /emt/config.yml -d ORGANIZATION_ID
 ```
@@ -217,7 +217,7 @@ You can check the logs with the following commands:
 | Deployment | Command |
 | -----------| --------|
 | Kubernetes | `kubectl logs <POD_NAME>` |
-| Docker | `docker logs <CONTAINER_ID>` | 
+| Docker | `docker logs <CONTAINER_ID>` |
 
 #### Example Log Output
 Here's an example log output of `curl -X POST -H "Content-Type: application/json" "https://httpbin.org/anything" -d '{"foo": "bar"}'` being proxied through the network broker:
@@ -258,11 +258,11 @@ allowlist:
 ### Not using the Default Config Flag
 If you are not using the `-d <ORGANIZATION_ID>` flag to [pull the default configuration](README.md#pulling-additional-default-configuration-with-deployment_id), you will need to manually add these values to your configuration YAML file.
 
-These values can be found already customized to your organization on the Broker settings page in the Semgrep Cloud Platform. 
+These values can be found already customized to your organization on the Broker settings page in the Semgrep Cloud Platform.
 
 If you want to construct them manually you will need to:
 1. Add the following config items under `inbound` in your config.
-2 Replace the `<HEX_ORG_ID>` with the hexadecimal version of your <ORGANIZATION_ID>. You can use a tool like [Decimal to Hexadecimal converter](https://www.rapidtables.com/convert/number/decimal-to-hex.html) to perform the conversion if needed. 
+2 Replace the `<HEX_ORG_ID>` with the hexadecimal version of your <ORGANIZATION_ID>. You can use a tool like [Decimal to Hexadecimal converter](https://www.rapidtables.com/convert/number/decimal-to-hex.html) to perform the conversion if needed.
 
 ```yaml
 inbound:
@@ -307,10 +307,10 @@ Refer to the [network broker docs on semgrep.dev](https://semgrep.dev/docs/semgr
 
 ## Broker Allowlist
 
-The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. By default, the allowlist will automatically be populated and does not need explicit configuration. 
+The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. By default, the allowlist will automatically be populated and does not need explicit configuration.
 
 Allowlist Behaviour:
-- When multiple version of an allowlist item exist, the first matching allowlist item is used. 
+- When multiple version of an allowlist item exist, the first matching allowlist item is used.
 - No allowlist match means the request will not be proxied.
 
 Examples:
@@ -369,7 +369,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Adding a `github` field to the config implicitly adds these endpoints to the allowlist: 
+Adding a `github` field to the config implicitly adds these endpoints to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Github -->
 - GET `https://github.example.com/api/v3/app`
@@ -438,7 +438,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Adding a `gitlab` field to the config implicitly adds these endpoints to the allowlist: 
+Adding a `gitlab` field to the config implicitly adds these endpoints to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Gitlab -->
 - GET `https://gitlab.example.com/api/v4/:entity_type/:namespace/projects`
@@ -486,7 +486,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Adding a `bitbucket` field to the config implicitly adds these endpoints to the allowlist: 
+Adding a `bitbucket` field to the config implicitly adds these endpoints to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Bitbucket -->
 - GET `https://bitbucket.example.com/rest/api/latest/application-properties`
