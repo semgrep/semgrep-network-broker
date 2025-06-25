@@ -5,11 +5,14 @@ metadata:
 data:
   config.yaml: |
     # Review https://semgrep.dev/docs/semgrep-ci/network-broker for more instructions
-    # *NOTE*: This is a minimal example. You must update the deployment-id value and create a secret for the private key.
+    # This minimal example shows how to configure an optional allowlist and a GitHub Enterprise Server
     inbound:
-      wireguard:
-        peers:
-        - endpoint: wireguard.semgrep.dev:51820
+      allowlist: [] # Optional. Empty list means all traffic outbound from the broker is permitted
+    github:
+      baseURL: https://GITHUB_BASE_URL/api/v3
+      token: GITHUB_PAT
+      allowCodeAccess: true
+
 ---
 apiVersion: apps/v1
 kind: Deployment
