@@ -10,7 +10,6 @@ data:
       allowlist: [] # Optional. Empty list means all traffic outbound from the broker is permitted
       github:
         baseURL: https://GITHUB_BASE_URL/api/v3
-        allowCodeAccess: true
 
 ---
 apiVersion: apps/v1
@@ -31,7 +30,7 @@ spec:
     spec:
       containers:
       - name: broker
-        image: ghcr.io/semgrep/semgrep-network-broker:v0.34.0
+        image: ghcr.io/semgrep/semgrep-network-broker:v0.34.0 # Update to desired tag version from https://github.com/semgrep/semgrep-network-broker/tags
         args:
         - -c
         - /conf/config.yaml
@@ -62,14 +61,13 @@ spec:
           secretName: broker-secret
 
 # ---
-# To create the kubernetes secret for the WireGuard private key and GitHub PAT, generate a file named broker-secret.yaml with the following contents:
+# To create the kubernetes secret for the WireGuard private key, generate a file named broker-secret.yaml with the following contents:
 #
 #   inbound:
 #     wireguard:
 #       privateKey: WIREGUARD-PRIVATE-KEY-HERE
-#   github:
-#     token: GITHUB-PAT-HERE
 #
 # Then create the Kubernetes secret with:
 #
 #   kubectl create secret generic broker-secret --from-file=broker-secret.yaml
+# ---
