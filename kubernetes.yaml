@@ -8,10 +8,9 @@ data:
     # This minimal example shows how to configure an optional allowlist and a GitHub Enterprise Server
     inbound:
       allowlist: [] # Optional. Empty list means all traffic outbound from the broker is permitted
-    github:
-      baseURL: https://GITHUB_BASE_URL/api/v3
-      token: GITHUB_PAT
-      allowCodeAccess: true
+      github:
+        baseURL: https://GITHUB_BASE_URL/api/v3
+        allowCodeAccess: true
 
 ---
 apiVersion: apps/v1
@@ -37,7 +36,7 @@ spec:
         - -c
         - /conf/config.yaml
         - -c
-        - /private/private-key.yaml
+        - /secret/broker-secret.yaml
         - --deployment-id
         - "YOUR_ORGANIZATION_ID" # UPDATE with your organization ID from https://semgrep.dev/orgs/-/settings/general/identifiers
         resources:
@@ -51,24 +50,26 @@ spec:
         - mountPath: /conf
           name: config-volume
           readOnly: true
-        - mountPath: /private
-          name: private-key-volume
+        - mountPath: /secret
+          name: broker-secret-volume
           readOnly: true
       volumes:
       - name: config-volume
         configMap:
           name: broker-config
-      - name: private-key-volume
+      - name: broker-secret-volume
         secret:
-          secretName: broker-private-key
+          secretName: broker-secret
 
 # ---
-# To create the kubernetes secret for the WireGuard private key, generate a file named private-key.yaml with the following contents:
+# To create the kubernetes secret for the WireGuard private key and GitHub PAT, generate a file named broker-secret.yaml with the following contents:
 #
 #   inbound:
 #     wireguard:
 #       privateKey: WIREGUARD-PRIVATE-KEY-HERE
+#   github:
+#     token: GITHUB-PAT-HERE
 #
 # Then create the Kubernetes secret with:
 #
-#   kubectl create secret generic broker-private-key-yaml --from-file=private-key.yaml
+#   kubectl create secret generic broker-secret --from-file=broker-secret.yaml
