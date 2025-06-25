@@ -63,7 +63,7 @@ The configuration examples below assume you are using a published network broker
 Must be enabled by [Semgrep support](README.md#feature-availability).
 
 #### Semgrep Organization ID
-To retrieve your organization ID `ORGANIZATION_ID`, go to your Semgrep organization's settings page. From the General settings page, select Identifiers from the sub-menu. The numerical ID is located under the heading `Organization ID`.
+To retrieve your organization ID `ORGANIZATION_ID`, go to your Semgrep organization's [settings page](https://semgrep.dev/orgs/-/settings/general/identifiers). From the General settings page, select Identifiers from the sub-menu. The numerical ID is located under the heading `Organization ID`.
 
 #### Key Generation
 
