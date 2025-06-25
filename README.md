@@ -71,7 +71,7 @@ The broker requires a Wireguard keypair in order to establish a secure connectio
 
 1. Generate your private key `YOUR_PRIVATE_KEY`:
 ```bash
-docker run ghcr.io/semgrep/semgrep-network-broker:VERSION_TAG genkey
+docker run --rm ghcr.io/semgrep/semgrep-network-broker:latest genkey
 ```
 > _Do not_ share your private key with anyone (including Semgrep).
 
