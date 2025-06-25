@@ -4,21 +4,12 @@ metadata:
   name: broker-config
 data:
   config.yaml: |
-    # note: all of these values are bogus; the broker will start up but not actually work
+    # Review https://semgrep.dev/docs/semgrep-ci/network-broker for more instructions
+    # *NOTE*: This is a minimal example. You must update the deployment-id value and create a secret for the private key.
     inbound:
       wireguard:
-        localAddress: 192.168.0.2
-        privateKey: 8DzUuki1Qn+Fdoc8IuRfhCfEL6/OMAIknx45QGtJFVs=
         peers:
-        - publicKey: OgJxJJvNIFZb5UO15VACP9IlVnhkURq+v7PV80c0IB0=
-          endpoint: example.com:51820
-          allowedIps: 192.168.0.1/32
-      heartbeat:
-        url: http://192.168.0.1/ping
-      allowlist:
-        - url: http://example.com/*
-          methods:
-          - GET
+        - endpoint: wireguard.semgrep.dev:51820
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,11 +28,15 @@ spec:
         app: semgrep-network-broker
     spec:
       containers:
-      - name: gateway
-        image: image-goes-here
+      - name: broker
+        image: ghcr.io/semgrep/semgrep-network-broker:v0.34.0
         args:
         - -c
         - /conf/config.yaml
+        - -c
+        - /private/private-key.yaml
+        - --deployment-id
+        - "YOUR_ORGANIZATION_ID" # UPDATE with your organization ID from https://semgrep.dev/orgs/-/settings/general/identifiers
         resources:
           limits:
             cpu: "1"
@@ -53,7 +48,24 @@ spec:
         - mountPath: /conf
           name: config-volume
           readOnly: true
+        - mountPath: /private
+          name: private-key-volume
+          readOnly: true
       volumes:
       - name: config-volume
         configMap:
           name: broker-config
+      - name: private-key-volume
+        secret:
+          secretName: broker-private-key
+
+# ---
+# To create the kubernetes secret for the WireGuard private key, generate a file named private-key.yaml with the following contents:
+#
+#   inbound:
+#     wireguard:
+#       privateKey: WIREGUARD-PRIVATE-KEY-HERE
+#
+# Then create the Kubernetes secret with:
+#
+#   kubectl create secret generic broker-private-key-yaml --from-file=private-key.yaml
