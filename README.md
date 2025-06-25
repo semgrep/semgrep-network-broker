@@ -1,67 +1,280 @@
 # semgrep-network-broker
 
-**NOTE:** These docs are in-progress. Feel free to direct any questions / feedback / improvements to your private channel on the Semgrep slack!
-
 The Semgrep Network Broker facilitates secure access between Semgrep and a private network.
 
-The broker accomplishes this by establishing a Wireguard VPN tunnel with the Semgrep backend, and then proxying inbound (Semgrep --> customer) HTTP requests through this tunnel. This approach allows Semgrep to interact with on-prem resources without having to expose them to the public internet.
+The broker creates a WireGuard VPN tunnel to the Semgrep backend and proxies inbound HTTP requests (from Semgrep to the customer) through it. This allows Semgrep to communicate with private network resources like a Source Code Manager (SCM) or JIRA without exposing them to the public internet.
 
 Examples of inbound traffic include:
 
-- Pull Request comments
-- JIRA integrations
-- Webhooks
+- Pull request (PR) or merge request (MR) comments.
+- Code access for Semgrep Managed Scans (SMS) if enabled.
+- Webhooks.
 
-## Setup
+> **NOTE:** These docs are in-progress. Feel free to direct any questions / feedback / improvements to your private channel on the Semgrep slack!
 
-### Build
+## Feature Availability
 
-NOTE: The Semgrep Network broker uses [Buf](https://buf.build/) for protobuf compilation. If you are building the broker from scratch outside of Docker, make sure you have the Buf CLI installed: https://buf.build/docs/installation
+The Semgrep Network Broker is a feature that must be enabled in your Semgrep organization (org) before setup. 
+It is only available to paying customers.
+> Contact the [Semgrep support team](https://semgrep.dev/docs/support) to discuss having it enabled for your organization.
+If you will be using the broker with a dedicated Semgrep tenant, please note that in your request.
 
-- Run `make build` to build the `semgrep-network-broker` binary locally
-- Run `make docker` to build a docker image
-- Docker images are also published to [ghcr.io/semgrep/semgrep-network-broker](https://github.com/semgrep/semgrep-network-broker/pkgs/container/semgrep-network-broker)
+## Deployment
 
-### Keypairs
+The network broker can be run as a bare Docker container, in a Kubernetes cluster, or simply as a standalone binary on a machine. 
+
+Only one instance of the wireguard-based broker can be run concurrently. Multiple brokers with the same configuration can cause disconnects, instability, and package loss.
+
+### System Requirements
+- CPU: 1
+- RAM: 512 MB
+
+### Network Requirements
+- Between Semgrep and Broker:
+  - Allow traffic from `wireguard.semgrep.dev` on UDP port 51820. If on a dedicated Semgrep tenant, allow traffic from `wireguard.<tenant-name>.semgrep.dev` instead. 
+  - If using the `--deployment-id` CLI flag, allow outbound to `semgrep.dev` on TCP port 443 for HTTPS.
+- Between Broker and each private network resource:
+  - Enable outbound on TCP ports 80 and 443 for HTTP/HTTPS communication.
+
+> **NOTE** To determine the IP addresses for a domain, use dig. The addresses are listed under the ANSWER section. Example: `dig wireguard.semgrep.dev`
+
+### Artifacts
+You can choose between deploying pre-made artifacts or building your own. 
+#### Pre-built by Semgrep
+- Docker images are available from [ghcr.io/semgrep/semgrep-network-broker](https://github.com/semgrep/semgrep-network-broker/pkgs/container/semgrep-network-broker).
+- A simple [Kubernetes Manifest](kubernetes.yaml) is present within the repository. This should be extended for production.
+
+#### Build Yourself
+> **NOTE:** The Semgrep Network broker uses [Buf](https://buf.build/) for protobuf compilation. If you are building the broker from scratch outside of Docker, make sure you have the Buf CLI installed: https://buf.build/docs/installation
+
+- Binary: Run `make build` to build the `semgrep-network-broker` binary locally.
+- Docker Image: Run `make docker` to build a docker image.
+
+## Configuration
+
+The network broker requires configuration in two locations:  
+1. The broker settings page in your Semgrep AppSec Platform organization. 
+2. A YAML file passed to the broker at execution. 
+
+The configuration examples below assume you are using a published network broker docker image.
+
+### Pre-requisites
+#### Enable the Broker Settings page in Semgrep.
+Must be enabled by [Semgrep support](README.md#feature-availability).
+
+#### Semgrep Organization ID
+To retrieve your organization ID `ORGANIZATION_ID`, go to your Semgrep organization's settings page. From the General settings page, select Identifiers from the sub-menu. The numerical ID is located under the heading `Organization ID`.
+
+#### Key Generation
 
 The broker requires a Wireguard keypair in order to establish a secure connection.
 
-- `semgrep-network-broker genkey` generates a random private key in base64 and prints it to stdout
-- `semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout
-
-#### Example
-
+1. Generate your private key `YOUR_PRIVATE_KEY`: 
 ```bash
-> semgrep-network-broker genkey
-some_private_key
-
-> echo "some_private_key" | semgrep-network-broker pubkey
-some_public_key
+docker run ghcr.io/semgrep/semgrep-network-broker:VERSION_TAG genkey
 ```
+> _Do not_ share your private key with anyone (including Semgrep).
 
-Your public key is safe to share. _Do not_ share your private key with anyone (including Semgrep).
+2. Generate your public key `YOUR_PUBLIC_KEY`: 
+```bash
+echo YOUR_PRIVATE_KEY | sudo docker run -i ghcr.io/semgrep/semgrep-network-broker:VERSION_NUMBER pubkey
+```
+> Your public key is safe to share. 
 
-### Configuration
+### Configure the Broker Settings Page
+The Semgrep backend needs your public key to connect to the broker. Your public key is shared in the Broker settings page of your Semgrep organization. 
+1. Log in to Semgrep AppSec Platform.
+2. Navigate to Settings > Broker.
+3. Paste your public key and click `Add Public Key`.
 
-Semgrep will help you create a configuration file tailored to your Semgrep deployment.
+### Configure the Broker YAML Config File
 
-**Do not** alter the `wireguard` section.
-
-**Do not** share the value of `inbound.wireguard.privateKey`. This is your organization's private key. Reach out to Semgrep on Slack if you need to rotate your Wireguard keys.
-
-Example:
+Create the YAML file that is passed to the broker during execution. The minimum `config.yaml` file has the following contents. Below are instructions to fill in the templated values marked with angle brackets.
 
 ```yaml
 inbound:
   wireguard:
-    localAddress: ...
-    privateKey: ...
-    peers:
-      - endpoint: ...
-  allowlist: [...]
+    privateKey: <YOUR_PRIVATE_KEY>
+  <SCM_NAME>:
+    baseUrl: <SCM_URL>
+    token: <SCM_SECRET>
+    allowCodeAccess: true   
 ```
 
-### HttpClient
+1. YOUR_PRIVATE_KEY: input the wireguard private key [generated earlier](README.md#key-generation).
+Do this once per type of Source Code Manager (SCM). If using multiple versions of the same SCM, [refer here](README.md#configure-access-to-multiple-scms).
+2. SCM_NAME: input the name of your private network resource. Refer to the table below.
+3. SCM_URL: input the URL of your private network resource. Refer to the table below. 
+
+#### Accepted SCM Config Values
+| Source Code Manager | SCM_NAME | SCM_URL | SCM_SECRET |
+| ------------- | -------------| ------------- | ------------- |
+| GitLab Server  |  gitlab   | `https://<GITLAB_BASE_URL>/api/v4` | Group Access Token with [`api`](https://semgrep.dev/docs/deployment/connect-scm#connect-to-on-premise-orgs-and-projects) and [`read_repository`](https://semgrep.dev/docs/semgrep-appsec-platform/scm-code-access#required-scm-code-access-scopes) scope |
+| GitHub Enterprise Server | github | `https://<GITHUB_BASE_URL>/api/v3`   | Not Applicable | 
+| BitBucket DataCenter <v7.17.x | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
+| BitBucket DataCenter >=v7.18.x. | bitbucket | `https://<BITBUCKET_BASE_URL>/rest/api/latest` | [HTTP Access Token](https://semgrep.dev/docs/deployment/managed-scanning/bitbucket#bitbucket-data-center) with `PROJECT_ADMIN` permissions |
+| Azure DevOps Server | azuredevops | `https://<ADO_BASE_URL>/*` | [Personal Access Token](https://semgrep.dev/docs/deployment/managed-scanning/azure#prerequisites-and-permissions) with `Full access` | 
+
+> **NOTE**: the SCM_Secret scopes/permissions listed are for setups allowing Semgrep access to Source Code. Downgrade the permissions if your setup does not require code access. For downgraded scopes, refer to the linked documentation.
+
+## Usage
+### Supplying the Config File
+Config file(s) are passed to the broker with the flag `-c <PATH_TO_CONFIG>`:
+
+Multiple config files can be overlaid on top of each other by passing multiple `-c` args (ex. `semgrep-network-broker -c config1.yaml -c config2.yaml -c config3.yaml`). Note that while maps will be merged together, arrays will be _replaced_.
+
+### Pulling Additional Default Configuration with DEPLOYMENT_ID
+On top of your local config file, the broker will need to pull additional configuration information from the Semgrep platform. 
+
+This is done with the flag `-d <ORGANIZATION_ID>` using the Semgrep Organization ID [retrieved earlier](README.md#semgrep-organization-id).
+
+### Running the Broker
+Here is the recommended default command to run the broker. 
+- It uses a published broker docker image. 
+- The config file is assumed to be located at `./config.yaml`.
+- It uses your `ORGANIZATION_ID` to pull the default config from Semgrep.  
+```
+docker run --rm-it -v ./config.yaml:/emt/config.yaml ghcr.io/semgrep/semgrep-network-broker:v0.34.0 -c /emt/config.yml -d ORGANIZATION_ID
+```
+### Other Commands
+
+#### dump
+
+`semgrep-network-broker dump` dumps the current config. This is useful to see what the result of multiple configurations overlays would result in
+
+#### genkey
+
+`semgrep-network-broker genkey` generates a base64 private key and prints to stdout.
+
+#### pubkey
+
+`semgrep-network-broker pubkey` reads a base64 private key from stdin and prints the corresponding base64 public key to stdout.
+
+#### relay
+
+`semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
+
+```yaml
+outbound:
+  listenPort: 8080
+  relay:
+    test:
+      destinationUrl: https://httpbin.org/anything
+      jsonPath: "$.foo"
+      equals:
+        - bar
+```
+
+would result in requests addressed to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the jsonpath query `$.foo` executed on the request body results in the string `bar`.
+
+Check out an example [here](./examples/github-pr-comment-relay.yaml) for how to use the relay for GitHub PR comments.
+
+You can also define additional relay mappings via the `additionalConfigs` field:
+
+```yaml
+outbound:
+  listenPort: 8080
+  relay:
+    test:
+      destinationUrl: https://httpbin.org/anything
+      jsonPath: "$.foo"
+      equals:
+        - bar
+      additionalConfigs:
+        - destinationUrl: https://example.com/fallback
+```
+
+The example above would relay traffic to https://httpbin.org/anything if the request body contains `{"foo": "bar"}`, otherwise, it'd relay traffic to `htttps://example.com/fallback`.
+
+## Additional Scenarios
+### Enable Logging for Debugging
+
+> **Performance impact** Please enable these settings only while working to identify issues. Otherwise, significant memory in the tunnel is used on large request and response bodies.
+
+The `logging` configuration section allows you to set additional logging options for requests that are proxied through the broker.
+
+```yaml
+inbound:
+  logging:
+    logRequestBody: false # If true, the contents of any proxied HTTP request matching the allowlist will be logged in the request_body field in the proxy.request event
+    logResponseBody: false # If true, the contents of any proxied HTTP response will be logged in the response_body field in the proxy.response event
+```
+#### Logging Traffic to Specific Endpoints
+`logRequestBody` and `logResponseBody` can also be set on a per-allowlist basis:
+
+```yaml
+inbound:
+  allowlist:
+    - url: https://httpbin.org/*
+      methods: [GET, POST, DELETE]
+      logRequestBody: true
+      logResponseBody: true
+```
+#### Check the Logs
+You can check the logs with the following commands:
+| Deployment | Command |
+| -----------| --------|
+| Kubernetes | `kubectl logs <POD_NAME>` |
+| Docker | `docker logs <CONTAINER_ID>` | 
+
+#### Example Log Output
+Here's an example log output of `curl -X POST -H "Content-Type: application/json" "https://httpbin.org/anything" -d '{"foo": "bar"}'` being proxied through the network broker:
+
+```
+INFO[0006] request.start                                 client_ip="::1" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= user_agent=curl/8.2.1
+INFO[0006] proxy.request                                 allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= request_body="{\"foo\": \"bar\"}" user_agent=curl/8.2.1
+INFO[0006] proxy.response                                allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= response_body="{\n  \"args\": {}, \n  \"data\": \"{\\\"foo\\\": \\\"bar\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Accept\": \"*/*\", \n    \"Accept-Encoding\": \"gzip\", \n    \"Content-Length\": \"14\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"User-Agent\": \"curl/8.2.1\", \n    \"X-Amzn-Trace-Id\": \"Root=1-650469a8-0032596526902b563d7e5ebc\"\n  }, \n  \"json\": {\n    \"foo\": \"bar\"\n  }, \n  \"method\": \"POST\", \n  \"origin\": \"::1, ...snip..., ...snip...\", \n  \"url\": \"https://httpbin.org/anything\"\n}\n" user_agent=curl/8.2.1
+INFO[0006] request.response                              body_size=511 client_ip="::1" id=1 latency=341.905708ms method=POST path="/proxy/https://httpbin.org/anything" query= status_code=200 user_agent=curl/8.2.1
+```
+### Configure Access to Multiple SCMs
+It is possible to allow access to multiple source code managers (SCM) within a single configuration file. One entry for a given SCM uses the SCM-specific key provided in the configuration file, as shown in the following example for a GitHub Enterprise Server connection:
+```yaml
+github:
+  baseURL: https://GITHUB_BASE_URL/api/v3
+  token: GITHUB_PAT
+```
+Subsequent entries for the same type of SCM require you to modify allowlist and add specific information needed for the HTTP requests. The following is a sample allowlist for additional GitHub Enterprise Servers:
+```yaml
+allowlist:
+ - url: https://GITHUB_BASE_URL/api/v3/repos/:owner/:repo
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer GITHUB_PAT"
+ - url: https://GITHUB_BASE_URL/api/v3/repos/:owner/:repo/pulls
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer GITHUB_PAT"
+ - url: https://GITHUB_BASE_URL/api/v3/repos/:owner/:repo/pulls/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer GITHUB_PAT"
+ - url: https://GITHUB_BASE_URL/api/v3/:owner/:repo/issues/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer GITHUB_PAT"
+```
+### Not using the Default Config Flag
+If you are not using the `-d <ORGANIZATION_ID>` flag to [pull the default configuration](README.md#pulling-additional-default-configuration-with-deployment_id), you will need to manually add these values to your configuration YAML file.
+
+These values can be found already customized to your organization on the Broker settings page in the Semgrep Cloud Platform. 
+
+If you want to construct them manually you will need to:
+1. Add the following config items under `inbound` in your config.
+2 Replace the `<HEX_ORG_ID>` with the hexadecimal version of your <ORGANIZATION_ID>. You can use a tool like [Decimal to Hexadecimal converter](https://www.rapidtables.com/convert/number/decimal-to-hex.html) to perform the conversion if needed. 
+
+```yaml
+inbound:
+  wireguard:
+    localAddress: fdf0:59dc:33cf:9be8:0:<HEX_ORG_ID>:0:1
+    peers:
+      - publicKey: 4EqJwDZ8X/qXB5u3Wpo2cxnKlysec93uhRvGWPix0lg=
+        endpoint: wireguard.semgrep.dev:51820
+        allowedIps: fdf0:59dc:33cf:9be9::1/128
+  heartbeat:
+    url: http://[fdf0:59dc:33cf:9be9:0000:0000:0000:0001]/ping
+
+
+### Use of an HttpClient
 
 The `httpClient` configuration section modifies the HTTP client used for proxying requests.
 
@@ -90,6 +303,56 @@ $ docker run \
 
 Refer to the [network broker docs on semgrep.dev](https://semgrep.dev/docs/semgrep-ci/network-broker) for more detail on docker setup.
 
+## Broker Allowlist
+
+The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. By default, the allowlist will automatically be populated and does not need explicit configuration. 
+
+Allowlist Behaviour:
+- When multiple version of an allowlist item exist, the first matching allowlist item is used. 
+- No allowlist match means the request will not be proxied.
+
+Examples:
+
+```yaml
+inbound:
+  allowlist:
+    # allow GET requests from http://example.com/foo (exact URL match)
+    - url: http://example.com/foo
+      methods: [GET]
+    # allow GET or POST requests from any path on http://example.com
+    - url: http://example.com/*
+      methods: [GET, POST]
+    # allow GET requests from a URL that looks like a GitHub Enterprise review comments URL, and add a bearer token to the request
+    - url: http://example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
+      methods: [GET]
+      setRequestHeaders:
+        Authorization: "Bearer ...snip..."
+```
+
+### Real-world example
+
+Here's an example of allowing PR comments for a GitHub Enterprise instance hosted on https://git.example.com. Replace `<GH TOKEN>` with a GitHub PAT.
+
+```yaml
+allowlist:
+  - url: https://git.example.com/api/v3/repos/:owner/:repo
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls
+    methods: [GET]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+  - url: https://git.example.com/api/v3/repos/:owner/:repo/issues/:number/comments
+    methods: [POST]
+    setRequestHeaders:
+      Authorization: "Bearer <GH TOKEN>"
+```
+
 ### GitHub
 
 The `github` configuration section simplifies granting Semgrep access to leave PR comments.
@@ -104,7 +367,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Under the hood, this config adds these allowlist items:
+Adding a `github` field to the config implicitly adds these endpoints to the allowlist: 
 
 <!-- BeginAutogeneratedAllowList:Github -->
 - GET `https://github.example.com/api/v3/app`
@@ -149,7 +412,7 @@ Under the hood, this config adds these allowlist items:
 - DELETE `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
 <!-- EndAutogeneratedAllowList:Github -->
 
-And if `allowCodeAccess` is set, additionally:
+And if `allowCodeAccess` is set, these endpoints are added to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Github.AllowCodeAccess -->
 - GET `https://github.example.com/:owner/:repo/info/refs`
@@ -173,7 +436,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Under the hood, this config adds these allowlist items:
+Adding a `gitlab` field to the config implicitly adds these endpoints to the allowlist: 
 
 <!-- BeginAutogeneratedAllowList:Gitlab -->
 - GET `https://gitlab.example.com/api/v4/:entity_type/:namespace/projects`
@@ -200,7 +463,7 @@ Under the hood, this config adds these allowlist items:
 - DELETE `https://gitlab.example.com/api/v4/projects/:project/hooks/:hook`
 <!-- EndAutogeneratedAllowList:Gitlab -->
 
-And if `allowCodeAccess` is set, additionally:
+And if `allowCodeAccess` is set, these endpoints are added to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Gitlab.AllowCodeAccess -->
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/commits`
@@ -221,7 +484,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Under the hood, this config adds these allowlist items:
+Adding a `bitbucket` field to the config implicitly adds these endpoints to the allowlist: 
 
 <!-- BeginAutogeneratedAllowList:Bitbucket -->
 - GET `https://bitbucket.example.com/rest/api/latest/application-properties`
@@ -244,7 +507,7 @@ Under the hood, this config adds these allowlist items:
 - DELETE `https://bitbucket.example.com/rest/api/latest/projects/:project/webhooks/:webhook`
 <!-- EndAutogeneratedAllowList:Bitbucket -->
 
-And if `allowCodeAccess` is set, additionally:
+And if `allowCodeAccess` is set, these endpoints are added to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:Bitbucket.AllowCodeAccess -->
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/browse/*`
@@ -264,7 +527,7 @@ inbound:
     allowCodeAccess: false # default is false, set to true to allow Semgrep to read file contents
 ```
 
-Under the hood, this config adds these allowlist items:
+Adding a `gitlab` field to the config implicitly adds these endpoints to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:AzureDevOps -->
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories`
@@ -284,154 +547,9 @@ Under the hood, this config adds these allowlist items:
 - PATCH `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments/:commentId`
 <!-- EndAutogeneratedAllowList:AzureDevOps -->
 
-And if `allowCodeAccess` is set, additionally:
+And if `allowCodeAccess` is set, these endpoints are added to the allowlist:
 
 <!-- BeginAutogeneratedAllowList:AzureDevOps.AllowCodeAccess -->
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/items`
 - POST `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/commits/:commit/statuses`
 <!-- EndAutogeneratedAllowList:AzureDevOps.AllowCodeAccess -->
-
-### Allowlist
-
-The `allowlist` configuration section provides finer-grained control over what HTTP requests are allowed to be forwarded out of the broker. The first matching allowlist item is used. No allowlist match means the request will not be proxied.
-
-Examples:
-
-```yaml
-inbound:
-  allowlist:
-    # allow GET requests from http://example.com/foo (exact URL match)
-    - url: http://example.com/foo
-      methods: [GET]
-    # allow GET or POST requests from any path on http://example.com
-    - url: http://example.com/*
-      methods: [GET, POST]
-    # allow GET requests from a URL that looks like a GitHub Enterprise review comments URL, and add a bearer token to the request
-    - url: http://example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
-      methods: [GET]
-      setRequestHeaders:
-        Authorization: "Bearer ...snip..."
-```
-
-### Real-world example
-
-Here's an example of allowing PR comments for a GitHub Enterprise instance hosted on https://git.example.com. Replace `<GH TOKEN>` with a GitHub PAT.
-
-```yaml
-allowlist:
-  - url: https://git.example.com/api/v3/repos/:owner/:repo
-    methods: [GET]
-    setRequestHeaders:
-      Authorization: "Bearer <GH TOKEN>"
-  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls
-    methods: [GET]
-    setRequestHeaders:
-      Authorization: "Bearer <GH TOKEN>"
-  - url: https://git.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments
-    methods: [POST]
-    setRequestHeaders:
-      Authorization: "Bearer <GH TOKEN>"
-  - url: https://git.example.com/api/v3/repos/:owner/:repo/issues/:number/comments
-    methods: [POST]
-    setRequestHeaders:
-      Authorization: "Bearer <GH TOKEN>"
-```
-
-### Logging
-
-The `logging` configuration section allows you to set additional logging options for requests that are proxied through the broker.
-
-```yaml
-inbound:
-  logging:
-    logRequestBody: false # If true, the contents of any proxied HTTP request matching the allowlist will be logged in the request_body field in the proxy.request event
-    logResponseBody: false # If true, the contents of any proxied HTTP response will be logged in the response_body field in the proxy.response event
-```
-
-Here's an example log output of `curl -X POST -H "Content-Type: application/json" "https://httpbin.org/anything" -d '{"foo": "bar"}'` being proxied through the network broker:
-
-```
-INFO[0006] request.start                                 client_ip="::1" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= user_agent=curl/8.2.1
-INFO[0006] proxy.request                                 allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= request_body="{\"foo\": \"bar\"}" user_agent=curl/8.2.1
-INFO[0006] proxy.response                                allowlist_match="https://httpbin.org/*" client_ip="::1" destinationUrl="https://httpbin.org/anything" id=1 method=POST path="/proxy/https://httpbin.org/anything" query= response_body="{\n  \"args\": {}, \n  \"data\": \"{\\\"foo\\\": \\\"bar\\\"}\", \n  \"files\": {}, \n  \"form\": {}, \n  \"headers\": {\n    \"Accept\": \"*/*\", \n    \"Accept-Encoding\": \"gzip\", \n    \"Content-Length\": \"14\", \n    \"Content-Type\": \"application/json\", \n    \"Host\": \"httpbin.org\", \n    \"User-Agent\": \"curl/8.2.1\", \n    \"X-Amzn-Trace-Id\": \"Root=1-650469a8-0032596526902b563d7e5ebc\"\n  }, \n  \"json\": {\n    \"foo\": \"bar\"\n  }, \n  \"method\": \"POST\", \n  \"origin\": \"::1, ...snip..., ...snip...\", \n  \"url\": \"https://httpbin.org/anything\"\n}\n" user_agent=curl/8.2.1
-INFO[0006] request.response                              body_size=511 client_ip="::1" id=1 latency=341.905708ms method=POST path="/proxy/https://httpbin.org/anything" query= status_code=200 user_agent=curl/8.2.1
-```
-
-`logRequestBody` and `logResponseBody` can also be set on a per-allowlist basis:
-
-```yaml
-inbound:
-  allowlist:
-    - url: https://httpbin.org/*
-      methods: [GET, POST, DELETE]
-      logRequestBody: true
-      logResponseBody: true
-```
-
-## Usage
-
-The broker can be run in Kubernetes, as a bare Docker container, or simply as a standalone binary on a machine. If more than one instance of the broker is run at a time to manage availability, you may see some noise in the logs as the broker is not yet architected with this specific configuration in mind. However, it should still perform correctly without duplicating requests.
-
-Config file(s) are passed to the app with `-c`:
-
-```bash
-semgrep-network-broker -c config.yaml
-```
-
-Multiple config files can be overlaid on top of each other by passing multiple `-c` args (ex. `semgrep-network-broker -c config1.yaml -c config2.yaml -c config3.yaml`). Note that while maps will be merged together, arrays will be _replaced_.
-
-Requirements:
-
-- internet access to `wireguard.semgrep.dev` on UDP port 51820
-
-## Other Commands
-
-### dump
-
-`semgrep-network-broker dump` dumps the current config. This is useful to see what the result of multiple configurations overlays would result in
-
-### genkey
-
-`semgrep-network-broker genkey` generates a base64 private key to stdout
-
-### pubkey
-
-`semgrep-network-broker pubkey` generates a base64 public key for a given private key (via stdin)
-
-### relay
-
-`semgrep-network-broker relay` launches an HTTP server that relays request that match a certain rule.
-
-```yaml
-outbound:
-  listenPort: 8080
-  relay:
-    test:
-      destinationUrl: https://httpbin.org/anything
-      jsonPath: "$.foo"
-      equals:
-        - bar
-```
-
-would result in requests addressed to http://localhost:8080/relay/test being relayed to https://httpbin.org/anything as long as the result of the jsonpath query `$.foo` executed on the request body results in the string `bar`.
-
-Check out an example [here](./examples/github-pr-comment-relay.yaml) for how to use the relay for GitHub PR comments.
-
-You can also define additional relay mappings via the `additionalConfigs` field:
-
-```yaml
-outbound:
-  listenPort: 8080
-  relay:
-    test:
-      destinationUrl: https://httpbin.org/anything
-      jsonPath: "$.foo"
-      equals:
-        - bar
-      additionalConfigs:
-        - destinationUrl: https://example.com/fallback
-```
-
-The example above would relay traffic to https://httpbin.org/anything if the request body contains `{"foo": "bar"}`, otherwise, it'd relay traffic to `htttps://example.com/fallback`.
-
-For other questions or feedback, join us on the [Semgrep Community Slack](https://go.semgrep.dev/slack).
