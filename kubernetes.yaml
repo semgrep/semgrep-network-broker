@@ -4,21 +4,13 @@ metadata:
   name: broker-config
 data:
   config.yaml: |
-    # note: all of these values are bogus; the broker will start up but not actually work
+    # Review https://semgrep.dev/docs/semgrep-ci/network-broker for more instructions.
+    # This minimal example shows how to configure an optional allowlist and a GitHub Enterprise Server.
     inbound:
-      wireguard:
-        localAddress: 192.168.0.2
-        privateKey: 8DzUuki1Qn+Fdoc8IuRfhCfEL6/OMAIknx45QGtJFVs=
-        peers:
-        - publicKey: OgJxJJvNIFZb5UO15VACP9IlVnhkURq+v7PV80c0IB0=
-          endpoint: example.com:51820
-          allowedIps: 192.168.0.1/32
-      heartbeat:
-        url: http://192.168.0.1/ping
-      allowlist:
-        - url: http://example.com/*
-          methods:
-          - GET
+      allowlist: [] # Optional. If unset, defaults to an empty array, permitting all outbound traffic from broker.
+      github:
+        baseURL: https://GHES_HOSTNAME/api/v3 # Update GHES_HOSTNAME to the domain of your GitHub server.
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -37,11 +29,16 @@ spec:
         app: semgrep-network-broker
     spec:
       containers:
-      - name: gateway
-        image: image-goes-here
+      - name: broker
+        # Optionally replace :latest with desired tag version from https://github.com/semgrep/semgrep-network-broker/tags
+        image: ghcr.io/semgrep/semgrep-network-broker:latest
         args:
         - -c
         - /conf/config.yaml
+        - -c
+        - /secret/broker-secret.yaml
+        - --deployment-id
+        - "YOUR_ORGANIZATION_ID" # Update with your organization ID from https://semgrep.dev/orgs/-/settings/general/identifiers
         resources:
           limits:
             cpu: "1"
@@ -53,7 +50,25 @@ spec:
         - mountPath: /conf
           name: config-volume
           readOnly: true
+        - mountPath: /secret
+          name: broker-secret-volume
+          readOnly: true
       volumes:
       - name: config-volume
         configMap:
           name: broker-config
+      - name: broker-secret-volume
+        secret:
+          secretName: broker-secret
+
+# ---
+# To create the kubernetes secret for the WireGuard private key, generate a file named broker-secret.yaml with the following contents:
+#
+#   inbound:
+#     wireguard:
+#       privateKey: WIREGUARD-PRIVATE-KEY-HERE
+#
+# Then create the Kubernetes secret with:
+#
+#   kubectl create secret generic broker-secret --from-file=broker-secret.yaml
+# ---
