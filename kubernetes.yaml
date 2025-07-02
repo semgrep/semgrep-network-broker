@@ -4,12 +4,12 @@ metadata:
   name: broker-config
 data:
   config.yaml: |
-    # Review https://semgrep.dev/docs/semgrep-ci/network-broker for more instructions
-    # This minimal example shows how to configure an optional allowlist and a GitHub Enterprise Server
+    # Review https://semgrep.dev/docs/semgrep-ci/network-broker for more instructions.
+    # This minimal example shows how to configure an optional allowlist and a GitHub Enterprise Server.
     inbound:
-      allowlist: [] # Optional. Empty list means all traffic outbound from the broker is permitted
+      allowlist: [] # Optional. If unset, defaults to an empty array, permitting all outbound traffic from broker.
       github:
-        baseURL: https://GITHUB_BASE_URL/api/v3
+        baseURL: https://GHES_HOSTNAME/api/v3 # Update GHES_HOSTNAME to the domain of your GitHub server.
 
 ---
 apiVersion: apps/v1
@@ -30,14 +30,15 @@ spec:
     spec:
       containers:
       - name: broker
-        image: ghcr.io/semgrep/semgrep-network-broker:v0.34.0 # Update to desired tag version from https://github.com/semgrep/semgrep-network-broker/tags
+        # Optionally replace :latest with desired tag version from https://github.com/semgrep/semgrep-network-broker/tags
+        image: ghcr.io/semgrep/semgrep-network-broker:latest 
         args:
         - -c
         - /conf/config.yaml
         - -c
         - /secret/broker-secret.yaml
         - --deployment-id
-        - "YOUR_ORGANIZATION_ID" # UPDATE with your organization ID from https://semgrep.dev/orgs/-/settings/general/identifiers
+        - "YOUR_ORGANIZATION_ID" # Update with your organization ID from https://semgrep.dev/orgs/-/settings/general/identifiers
         resources:
           limits:
             cpu: "1"
