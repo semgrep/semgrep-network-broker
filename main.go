@@ -15,7 +15,11 @@ func init() {
 	// gitlab regex from semgrep-rules-secrets
 	rh := &redactrus.Hook{
 		AcceptedLevels: log.AllLevels,
-		RedactionList:  []string{"(oauth2:)gh[ps]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}|glpat-[a-zA-Z0-9-=_]{20,22}(@)"},
+		RedactionList: []string{
+			"(oauth2:)gh[ps]_[a-zA-Z0-9]{36}(@)",
+			"(oauth2:)github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}(@)",
+			"(oauth2:)glpat-[a-zA-Z0-9-=_]{20,22}(@)",
+		},
 	}
 
 	log.AddHook(rh)
