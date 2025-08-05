@@ -11,10 +11,15 @@ func init() {
 	// Create Redactrus hook that is triggered
 	// for every logger level and redacts
 	// github oauth tokens from logs
-	// regex source: https://gist.github.com/magnetikonline/073afe7909ffdd6f10ef06a00bc3bc88
+	// github regex source: https://gist.github.com/magnetikonline/073afe7909ffdd6f10ef06a00bc3bc88
+	// gitlab regex from semgrep-rules-secrets
 	rh := &redactrus.Hook{
 		AcceptedLevels: log.AllLevels,
-		RedactionList:  []string{"(oauth2:)gh[ps]_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}(@)"},
+		RedactionList: []string{
+			"(oauth2:)gh[ps]_[a-zA-Z0-9]{36}(@)",
+			"(oauth2:)github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}(@)",
+			"(oauth2:)glpat-[a-zA-Z0-9-=_]{20,22}(@)",
+		},
 	}
 
 	log.AddHook(rh)
