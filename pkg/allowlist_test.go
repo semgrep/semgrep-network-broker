@@ -141,6 +141,50 @@ func TestAllowlistEncodedPathMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/test-group/test-project/repository/files/path/to/file", false)
 }
 
+func TestAllowlistWildcardMatch(t *testing.T) {
+	allowlist := &Allowlist{
+		AllowlistItem{
+			URL:     "https://gitlab.example.com/*/:repo/info/refs",
+			Methods: ParseHttpMethods([]string{"GET"}),
+		},
+		AllowlistItem{
+			URL:     "https://gitlab.example.com/api/v3/*",
+			Methods: ParseHttpMethods([]string{"GET"}),
+		},
+		AllowlistItem{
+			URL:     "https://gitlab.example.com/api/v4*",
+			Methods: ParseHttpMethods([]string{"GET"}),
+		},
+	}
+
+	// Test leading wildcard matches
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/user/repo/info/refs", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/group/subgroup/repo/info/refs", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/endpoint?path=/info/refs", false)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/endpoint#repo/info/refs", false)
+
+	// Test trailing wildcard matches
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/*", false)
+
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v3", false)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v3/", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v3/projects/123", true)
+
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/123", true)
+}
+
+func TestAllowlistParamMatch(t *testing.T) {
+	allowlist := &Allowlist{
+		AllowlistItem{
+			URL:     "https://gitlab.example.com/api/v4/projects/:group/repository/files/:file_path",
+			Methods: ParseHttpMethods([]string{"GET"}),
+		},
+	}
+
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/123/repository/files/path%2Fto%2Ffile", true)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/123/repository/files/path/to/file", false)
+}
+
 func createCombinedAllowlist() *Allowlist {
 	config := &Config{
 		Inbound: InboundProxyConfig{
