@@ -892,6 +892,14 @@ func PopulateAllowLists(config *Config) error {
 			return fmt.Errorf("failed to parse bitbucket base URL: %v", err)
 		}
 
+		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
+		// which requests resources which don't have the typical `/rest/api/latest/scm/` api suffix
+		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
+		bitBucketRootUrl, err := url.Parse(bitBucketBaseUrl.Scheme + "://" + bitBucketBaseUrl.Host)
+		if err != nil {
+			return fmt.Errorf("failed to build bitbucket root URL: %v", err)
+		}
+
 		var headers map[string]string
 		if bitBucket.Token != "" {
 			headers = map[string]string{
@@ -981,8 +989,8 @@ func PopulateAllowLists(config *Config) error {
 		)
 
 		if config.Inbound.BitBucket.AllowCodeAccess {
-			// get contents of file
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
+				// get contents of file
 				AllowlistItem{
 					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/browse/*").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
@@ -994,10 +1002,16 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
-				// checkout repo
+				// discover refs
 				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/scm/:project/:repo/*").String(),
+					URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/info/refs").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// download repo contents
+				AllowlistItem{
+					URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/git-upload-pack").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 			)
