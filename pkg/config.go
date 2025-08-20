@@ -709,6 +709,14 @@ func PopulateAllowLists(config *Config) error {
 			return fmt.Errorf("failed to parse gitlab base URL: %v", err)
 		}
 
+		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
+		// which requests resources which don't have an api suffix, e.g. /api/v4/
+		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
+		gitLabRootUrl, err := url.Parse(gitLabBaseUrl.Scheme + "://" + gitLabBaseUrl.Host)
+		if err != nil {
+			return fmt.Errorf("failed to build gitlab root URL: %v", err)
+		}
+
 		var headers map[string]string
 		if gitLab.Token != "" {
 			headers = map[string]string{
@@ -857,6 +865,18 @@ func PopulateAllowLists(config *Config) error {
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// discover refs
+				AllowlistItem{
+					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/info/refs").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// download project contents
+				AllowlistItem{
+					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/git-upload-pack").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 			)
