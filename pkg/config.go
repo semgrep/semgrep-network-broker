@@ -321,6 +321,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 
 		config.Inbound.Wireguard.LocalAddress = token.WireguardCredential.LocalAddress
 		config.Inbound.Wireguard.PrivateKey = token.WireguardCredential.PrivateKey
+		log.WithField("source", "broker_token").Info("Loaded WireGuard private key from broker token")
 	}
 
 	// Step 2: Apply config values from semgrep.dev/api/broker/{deployment_id}/default-config, if a deployment ID is provided
@@ -371,7 +372,22 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
-	// Step 4: Resolve TXT record(s) of wireguard peers, fill in config values if not set in a config file
+	// Step 4: Apply private key from environment variable if provided (takes precedence over all other sources)
+	if privateKeyEnv := os.Getenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY"); privateKeyEnv != "" {
+		if len(config.Inbound.Wireguard.PrivateKey) > 0 {
+			log.WithField("source", "environment_variable").Warn("SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable overriding previously configured private key")
+		}
+
+		privateKeyBytes, err := base64.StdEncoding.DecodeString(privateKeyEnv)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode SEMGREP_NETWORK_BROKER_PRIVATE_KEY: %v", err)
+		}
+
+		config.Inbound.Wireguard.PrivateKey = SensitiveBase64String(privateKeyBytes)
+		log.WithField("source", "environment_variable").Info("Loaded WireGuard private key from SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable")
+	}
+
+	// Step 5: Resolve TXT record(s) of wireguard peers, fill in config values if not set in a config file
 	if !config.Inbound.Wireguard.DisablePeerSettingsDnsLookup {
 		for i := range config.Inbound.Wireguard.Peers {
 			peer := &config.Inbound.Wireguard.Peers[i]
@@ -427,7 +443,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		}
 	}
 
-	// Step 5: Apply default values to any remaining unset config fields
+	// Step 6: Apply default values to any remaining unset config fields
 	defaults.SetDefaults(config)
 
 	if err := PopulateAllowLists(config); err != nil {
