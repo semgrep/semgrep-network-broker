@@ -3,6 +3,7 @@ package pkg
 import (
 	"encoding/base64"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 
@@ -133,5 +134,30 @@ func TestHttpMethodsDecodeHook(t *testing.T) {
 
 	if output.Methods != HttpMethods(expected) {
 		t.Error(fmt.Errorf("No match: %+v != %+v", output.Methods, expected))
+	}
+}
+
+func TestPrivateKeyEnvironmentVariable(t *testing.T) {
+	// Test that SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable is properly loaded
+	testPrivateKey := "KJR4EeL83nexOFihmdYciri7Mo7ciAq/b5/S0lREcns="
+
+	// Set the environment variable
+	os.Setenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY", testPrivateKey)
+	defer os.Unsetenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY")
+
+	// Load config
+	config, err := LoadConfig(nil, 0)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Verify the private key was loaded correctly
+	expectedBytes, err := base64.StdEncoding.DecodeString(testPrivateKey)
+	if err != nil {
+		t.Fatalf("Failed to decode test private key: %v", err)
+	}
+
+	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, SensitiveBase64String(expectedBytes)) {
+		t.Errorf("Private key not loaded correctly from environment variable")
 	}
 }
