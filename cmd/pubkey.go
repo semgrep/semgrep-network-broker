@@ -8,10 +8,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
-
-const privateKeyLength = 32
 
 var pubkeyCmd = &cobra.Command{
 	Use:   "pubkey",
@@ -22,13 +21,13 @@ var pubkeyCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		keyBytes := make([]byte, privateKeyLength)
+		keyBytes := make([]byte, device.NoisePrivateKeySize)
 		n, err := base64.StdEncoding.Decode(keyBytes, keyBase64)
 		if err != nil {
 			log.Panic(err)
 		}
-		if n != privateKeyLength {
-			log.Panic(fmt.Sprintf("expected private key to be %d bytes decoded, got %d", privateKeyLength, n))
+		if n != device.NoisePrivateKeySize {
+			log.Panic(fmt.Sprintf("expected private key to be %d bytes decoded, got %d", device.NoisePrivateKeySize, n))
 		}
 
 		privateKey, err := wgtypes.NewKey(keyBytes)
