@@ -20,13 +20,13 @@ var pubkeyCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		keyBytes := make([]byte, 32)
+		keyBytes := make([]byte, wgtypes.KeyLen)
 		n, err := base64.StdEncoding.Decode(keyBytes, keyBase64)
 		if err != nil {
 			log.Panic(err)
 		}
-		if n != 32 {
-			log.Panic("not enough bytes")
+		if n != wgtypes.KeyLen {
+			log.Panic(fmt.Sprintf("expected private key to be %d bytes decoded, got %d", wgtypes.KeyLen, n))
 		}
 
 		privateKey, err := wgtypes.NewKey(keyBytes)
