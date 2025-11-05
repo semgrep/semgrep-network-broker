@@ -11,6 +11,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+const privateKeyLength = 32
+
 var pubkeyCmd = &cobra.Command{
 	Use:   "pubkey",
 	Short: "Reads a base64 private key from stdin, outputs the corresponding base64 public key",
@@ -20,13 +22,13 @@ var pubkeyCmd = &cobra.Command{
 			log.Panic(err)
 		}
 
-		keyBytes := make([]byte, 32)
+		keyBytes := make([]byte, privateKeyLength)
 		n, err := base64.StdEncoding.Decode(keyBytes, keyBase64)
 		if err != nil {
 			log.Panic(err)
 		}
-		if n != 32 {
-			log.Panic("not enough bytes")
+		if n != privateKeyLength {
+			log.Panic(fmt.Sprintf("expected private key to be %d bytes decoded, got %d", privateKeyLength, n))
 		}
 
 		privateKey, err := wgtypes.NewKey(keyBytes)
