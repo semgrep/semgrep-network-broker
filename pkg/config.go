@@ -1078,7 +1078,7 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// PR info
+			// get pull requests
 			AllowlistItem{
 				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
@@ -1151,6 +1151,12 @@ func PopulateAllowLists(config *Config) error {
 				AllowlistItem{
 					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_git/:repo/git-upload-pack").String(),
 					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// get pull request
+				AllowlistItem{
+					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/pullrequests/:number").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 			)
