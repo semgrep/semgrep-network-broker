@@ -1014,6 +1014,12 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
+				// get commits
+				AllowlistItem{
+					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
 			)
 		}
 	}
