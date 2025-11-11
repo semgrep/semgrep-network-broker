@@ -861,6 +861,12 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
+				// get merge base
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/merge_base").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
 				// Update commit status
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
