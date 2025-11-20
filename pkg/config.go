@@ -870,7 +870,7 @@ func PopulateAllowLists(config *Config) error {
 				// Update commit status
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
+					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 				// discover refs
