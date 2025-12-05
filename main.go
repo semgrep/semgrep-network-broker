@@ -19,6 +19,7 @@ func init() {
 			"(oauth2:)gh[ps]_[a-zA-Z0-9]{36}(@)",
 			"(oauth2:)github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59}(@)",
 			"(oauth2:)glpat-[a-zA-Z0-9-=_]{20,22}(@)",
+			"(oauth2:)glpat-[A-Za-z0-9_-]{36,38}\.01\.[a-z0-9]{9}"
 		},
 	}
 
