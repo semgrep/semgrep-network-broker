@@ -143,11 +143,15 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	})
 
 	// its showtime!
+	readyCh := make(chan struct{})
 	go func() {
 		wireguardListener, err := tnet.ListenTCP(&net.TCPAddr{Port: config.ProxyListenPort})
 		if err != nil {
 			log.Panic(fmt.Errorf("failed to start TCP listener: %v", err))
 		}
+
+		log.Info("broker.start")
+		close(readyCh)
 
 		err = r.RunListener(wireguardListener)
 		if err != nil {
@@ -155,7 +159,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		}
 	}()
 
-	log.Info("broker.start")
+	<-readyCh
 
 	return nil
 }
