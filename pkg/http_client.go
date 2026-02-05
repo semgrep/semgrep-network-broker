@@ -29,7 +29,8 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 	var certPool *x509.CertPool // nil certPool == use default system certs
 
 	if len(hcc.AdditionalCACerts) > 0 {
-		certPool, err := x509.SystemCertPool()
+		var err error
+		certPool, err = x509.SystemCertPool()
 		if err != nil {
 			return nil, err
 		}
