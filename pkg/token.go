@@ -13,9 +13,9 @@ const tokenStringEnvVar = "SEMGREP_NETWORK_BROKER_TOKEN"
 const tokenPathEnvVar = tokenStringEnvVar + "_PATH"
 
 func LoadTokenFromEnv() (string, error) {
-	token := os.Getenv(tokenPathEnvVar)
+	token := os.Getenv(tokenStringEnvVar)
 	if token != "" {
-		return "", nil
+		return token, nil
 	}
 
 	tokenPath := os.Getenv(tokenPathEnvVar)
