@@ -135,6 +135,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - POST `https://github.example.com/api/v3/app/installations/:id/access_tokens`
 - POST `https://github.example.com/api/v3/orgs/:org/hooks`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/check-runs`
+- POST `https://github.example.com/api/v3/repos/:owner/:repo/git/refs`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies`

@@ -664,6 +664,11 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
 		)
 
 		if config.Inbound.GitHub.AllowCodeAccess {
