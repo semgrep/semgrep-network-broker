@@ -702,6 +702,18 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
+				// push repo contents
+				AllowlistItem{
+					URL:               githubRootUrl.JoinPath("/:owner/:repo/git-receive-pack").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// create pull request
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
 			)
 		}
 	}
@@ -887,6 +899,18 @@ func PopulateAllowLists(config *Config) error {
 				// download project contents
 				AllowlistItem{
 					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/git-upload-pack").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// push project contents
+				AllowlistItem{
+					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/git-receive-pack").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// create merge request
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
