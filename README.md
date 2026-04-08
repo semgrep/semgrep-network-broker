@@ -120,6 +120,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - GET `https://github.example.com/api/v3/repos/:org/:repo/actions/secrets/public-key`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/branches`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/branches/:branch`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/collaborators/:username/permission`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/compare/:basehead`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/contents/.github/workflows/semgrep.yml`
@@ -190,6 +191,7 @@ Adding a `gitlab` field to the config implicitly adds these endpoints to the all
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
+- GET `https://gitlab.example.com/api/v4/projects/:project/repository/branches/:branch`
 - POST `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
@@ -233,6 +235,7 @@ Adding a `bitbucket` field to the config implicitly adds these endpoints to the 
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo`
+- GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/branches`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/default-branch`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/comments/:comment`
@@ -278,6 +281,7 @@ Adding a `azuredevops` field to the config implicitly adds these endpoints to th
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests`
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations`
 - GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations/:iterationId/changes`
+- GET `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/refs`
 - GET `https://dev.azure.com/:namespace/:project/_apis/hooks/subscriptions`
 - GET `https://dev.azure.com/:namespace/_apis/connectionData`
 - GET `https://dev.azure.com/:namespace/_apis/projects/:project`
