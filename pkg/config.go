@@ -504,6 +504,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// get branch
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches/:branch").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post issue comment
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
@@ -820,6 +826,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// Get branch
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches/:branch").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// post MR comment
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
@@ -975,6 +987,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// list branches (used for branch existence check with filterText)
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// pull requests
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
@@ -1104,6 +1122,12 @@ func PopulateAllowLists(config *Config) error {
 			// repo info
 			AllowlistItem{
 				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// get refs (used for branch existence check)
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
