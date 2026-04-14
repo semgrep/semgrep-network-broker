@@ -143,6 +143,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/statuses/:commit`
 - PUT `https://github.example.com/api/v3/repos/:org/:repo/actions/secrets/SEMGREP_APP_TOKEN`
 - PUT `https://github.example.com/api/v3/repos/:owner/:repo/contents/.github/workflows/semgrep.yml`
+- PATCH `https://github.example.com/api/v3/app/hook/config`
 - PATCH `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
 - PATCH `https://github.example.com/api/v3/repos/:owner/:repo/check-runs/:check_run_id`
 - PATCH `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments/:comment_id`

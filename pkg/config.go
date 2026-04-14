@@ -597,7 +597,7 @@ func PopulateAllowLists(config *Config) error {
 			},
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/app/hook/config").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
+				Methods:           ParseHttpMethods([]string{"GET", "PATCH"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
