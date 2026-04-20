@@ -600,6 +600,17 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET", "PATCH"}),
 				SetRequestHeaders: headers,
 			},
+			// list and get webhook deliveries for the GitHub App
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries/:delivery_id").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
@@ -658,6 +669,17 @@ func PopulateAllowLists(config *Config) error {
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id").String(),
 				Methods:           ParseHttpMethods([]string{"DELETE", "PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			// list and get deliveries for an organization webhook
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries/:delivery_id").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			AllowlistItem{
