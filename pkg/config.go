@@ -924,21 +924,25 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
-				// discover refs
+				// discover refs ({:namespace/}+ requires one or more non-empty namespace
+				// segments, so GitLab subgroups of any depth match without admitting
+				// double-slash paths). String-concatenated rather than JoinPath'd
+				// because url.URL serialization percent-encodes `{` and `}`, which the
+				// URL Pattern parser would then reject.
 				AllowlistItem{
-					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/info/refs").String(),
+					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/info/refs",
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
 				// download project contents
 				AllowlistItem{
-					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/git-upload-pack").String(),
+					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-upload-pack",
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 				// push project contents
 				AllowlistItem{
-					URL:               gitLabRootUrl.JoinPath("/:namespace/:project/git-receive-pack").String(),
+					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-receive-pack",
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},

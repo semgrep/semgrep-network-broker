@@ -185,6 +185,54 @@ func TestAllowlistParamMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/123/repository/files/path/to/file", false)
 }
 
+func TestAllowlistGitLabSubgroupMatch(t *testing.T) {
+	config := &Config{
+		Inbound: InboundProxyConfig{
+			GitLab: &GitLab{
+				BaseURL:         "https://gitlab.example.com/api/v4",
+				AllowCodeAccess: true,
+			},
+			Allowlist: Allowlist{},
+		},
+	}
+	if err := PopulateAllowLists(config); err != nil {
+		t.Fatalf("PopulateAllowLists: %v", err)
+	}
+	allowlist := &config.Inbound.Allowlist
+
+	// Flat group still works.
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/group/repo.git/info/refs?service=git-upload-pack", true)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/group/repo.git/git-upload-pack", true)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/group/repo.git/git-receive-pack", true)
+
+	// One level of subgroup (the bug this test guards against).
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/group/subgroup/repo.git/info/refs?service=git-upload-pack", true)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/group/subgroup/repo.git/git-upload-pack", true)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/group/subgroup/repo.git/git-receive-pack", true)
+
+	// Deep nesting — GitLab supports up to 20 levels.
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/g/s1/s2/s3/s4/s5/repo.git/info/refs", true)
+
+	// Negative: no namespace at all is not a real GitLab git URL.
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/repo/info/refs", false)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/repo.git/git-upload-pack", false)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/repo.git/git-receive-pack", false)
+
+	// Negative: empty namespace via double-slash must not bypass the namespace
+	// requirement. With a `*` wildcard this would match (zero-or-more includes
+	// empty); the `{:namespace/}+` form rejects it.
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com//evil/info/refs", false)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com//evil/git-upload-pack", false)
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com//evil/git-receive-pack", false)
+	assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com//group/repo/info/refs", false)
+
+	// Negative: wrong host.
+	assertAllowlistMatch(t, allowlist, "GET", "https://evil.example.com/group/subgroup/repo/info/refs", false)
+
+	// Negative: method mismatch.
+	assertAllowlistMatch(t, allowlist, "DELETE", "https://gitlab.example.com/group/repo.git/info/refs", false)
+}
+
 func createCombinedAllowlist() *Allowlist {
 	config := &Config{
 		Inbound: InboundProxyConfig{
