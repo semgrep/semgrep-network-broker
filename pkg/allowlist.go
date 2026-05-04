@@ -3,7 +3,8 @@ package pkg
 import (
 	"net/url"
 
-	"github.com/ucarion/urlpath"
+	"github.com/dunglas/go-urlpattern"
+	log "github.com/sirupsen/logrus"
 )
 
 func (config AllowlistItem) Matches(method string, url *url.URL) bool {
@@ -12,21 +13,13 @@ func (config AllowlistItem) Matches(method string, url *url.URL) bool {
 		return false
 	}
 
-	parsedUrl, err := url.Parse(config.URL)
+	pattern, err := urlpattern.New(config.URL, "", nil)
 	if err != nil {
+		log.WithError(err).WithField("url", config.URL).Error("failed to compile url pattern")
 		return false
 	}
 
-	if parsedUrl.Scheme != url.Scheme || parsedUrl.Host != url.Host {
-		return false
-	}
-
-	matcher := urlpath.New(parsedUrl.EscapedPath())
-	if _, matches := matcher.Match(url.EscapedPath()); matches {
-		return true
-	}
-
-	return false
+	return pattern.Test(url.String(), config.URL)
 }
 
 func (allowlist Allowlist) FindMatch(method string, url *url.URL) (*AllowlistItem, bool) {
