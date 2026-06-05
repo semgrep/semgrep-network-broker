@@ -23,6 +23,35 @@ const metricsPath = "/metrics"
 const destinationUrlParam = "destinationUrl"
 const proxyPath = "/proxy/*" + destinationUrlParam
 
+const redactedHeaderValue = "REDACTED"
+
+// sensitiveHeaders are header names whose values must never be written to logs.
+// Keys are canonicalized via http.CanonicalHeaderKey for case-insensitive matching.
+var sensitiveHeaders = map[string]struct{}{
+	"Authorization":       {},
+	"Proxy-Authorization": {},
+	"Cookie":              {},
+	"Set-Cookie":          {},
+	"Private-Token":       {},
+	"X-Hub-Signature":     {},
+	"X-Hub-Signature-256": {},
+}
+
+// redactSensitiveHeaders returns a copy of the header map with the values of any
+// credential-bearing headers replaced by a redaction placeholder, so request and
+// response headers can be logged without leaking secrets.
+func redactSensitiveHeaders(headers http.Header) http.Header {
+	redacted := make(http.Header, len(headers))
+	for name, values := range headers {
+		if _, isSensitive := sensitiveHeaders[http.CanonicalHeaderKey(name)]; isSensitive {
+			redacted[name] = []string{redactedHeaderValue}
+			continue
+		}
+		redacted[name] = values
+	}
+	return redacted
+}
+
 func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	// ensure config is valid
 	if err := validate.Validate(config); err != nil {
@@ -97,7 +126,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		}
 
 		if config.Logging.LogRequestHeaders || allowlistMatch.LogRequestHeaders {
-			reqLogger = reqLogger.WithField("request_headers", c.Request.Header)
+			reqLogger = reqLogger.WithField("request_headers", redactSensitiveHeaders(c.Request.Header))
 		}
 
 		reqLogger.Info("proxy.request")
