@@ -162,7 +162,7 @@ func (config *OutboundProxyConfig) Start() error {
 		}
 
 		if config.Logging.LogRequestHeaders {
-			logger = logger.WithField("request_headers", c.Request.Header)
+			logger = logger.WithField("request_headers", RedactSensitiveHeaders(c.Request.Header))
 		}
 
 		if !match {
