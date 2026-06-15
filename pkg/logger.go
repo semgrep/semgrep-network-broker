@@ -2,6 +2,8 @@ package pkg
 
 import (
 	"fmt"
+	"net/http"
+	"net/textproto"
 	"sync/atomic"
 	"time"
 
@@ -9,6 +11,26 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
+
+var sensitiveHeaders = map[string]struct{}{
+	"Authorization":       {},
+	"Proxy-Authorization": {},
+	"Private-Token":       {},
+}
+
+// RedactSensitiveHeaders returns a copy of h with sensitive header values masked,
+// leaving the original (which is still forwarded upstream) untouched.
+func RedactSensitiveHeaders(h http.Header) http.Header {
+	redacted := make(http.Header, len(h))
+	for name, values := range h {
+		if _, ok := sensitiveHeaders[textproto.CanonicalMIMEHeaderKey(name)]; ok {
+			redacted[name] = []string{RedactedString}
+		} else {
+			redacted[name] = values
+		}
+	}
+	return redacted
+}
 
 func GetRequestFields(c *gin.Context) log.Fields {
 	if fields, ok := c.Value("fields").(log.Fields); ok {

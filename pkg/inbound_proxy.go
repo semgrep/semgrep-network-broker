@@ -97,7 +97,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 		}
 
 		if config.Logging.LogRequestHeaders || allowlistMatch.LogRequestHeaders {
-			reqLogger = reqLogger.WithField("request_headers", c.Request.Header)
+			reqLogger = reqLogger.WithField("request_headers", RedactSensitiveHeaders(c.Request.Header))
 		}
 
 		reqLogger.Info("proxy.request")
