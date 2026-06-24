@@ -67,6 +67,9 @@ By default the broker reaches the Semgrep gateway over WireGuard's standard UDP 
 
 Leave `preferTcpTransport` unset (or `false`) to keep the default UDP behavior.
 
+> [!NOTE]
+> Prefer the default UDP transport whenever possible. Tunneling WireGuard over TCP means a reliable transport (TCP) carries traffic that is itself often reliable (e.g. the broker's own HTTPS requests), which can lead to [TCP meltdown](https://en.wikipedia.org/wiki/Network_congestion#TCP_meltdown_problem): when the network degrades, the two TCP layers' retransmission and backoff timers fight each other, and throughput and latency can get noticeably worse than they would over UDP. Enable `preferTcpTransport` only when outbound UDP is genuinely unavailable.
+
 Example:
 
 ```yaml
