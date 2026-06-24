@@ -96,12 +96,12 @@ type WireguardBase struct {
 	Peers                        []WireguardPeer       `mapstructure:"peers" json:"peers" validate:"empty=false"`
 	Verbose                      bool                  `mapstructure:"verbose" json:"verbose"`
 	DisablePeerSettingsDnsLookup bool                  `mapstructure:"disablePeerSettingsDnsLookup" json:"disablePeerSettingsDnsLookup"`
-	// TcpTransportPort, when greater than zero, enables WireGuard-over-TCP
-	// encapsulation: instead of the default UDP transport, the broker dials the
-	// gateway's TCP listener on this port (reusing the peer endpoint's host).
-	// This supports customer networks where outbound TCP is allowed but UDP is
-	// blocked. Leave unset (0) to preserve the default UDP behavior.
-	TcpTransportPort int `mapstructure:"tcpTransportPort" json:"tcpTransportPort" validate:"gte=0"`
+	// PreferTcpTransport, when true, enables WireGuard-over-TCP encapsulation:
+	// instead of the default UDP transport, the broker dials the gateway over TCP
+	// at the same host:port as the peer endpoint. This supports customer networks
+	// where outbound TCP is allowed but UDP is blocked. Leave false to preserve
+	// the default UDP behavior.
+	PreferTcpTransport bool `mapstructure:"preferTcpTransport" json:"preferTcpTransport"`
 }
 
 type BitTester interface {

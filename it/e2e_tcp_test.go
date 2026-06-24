@@ -24,9 +24,13 @@ import (
 // replies back over the same TCP connection. This mirrors the gateway-side
 // encapsulation in semgrep-private-link PR #86 and proves the broker's TCP
 // transport interoperates with a genuine WireGuard device.
-func startTcpToUdpShim(t *testing.T, udpTarget string) int {
+//
+// It listens for TCP on tcpListenAddr, which is the same host:port the gateway
+// uses for UDP (TCP and UDP port namespaces are independent), matching the
+// broker's preferTcpTransport behavior of reusing the peer endpoint address.
+func startTcpToUdpShim(t *testing.T, tcpListenAddr string, udpTarget string) {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", tcpListenAddr)
 	if err != nil {
 		t.Fatalf("failed to start tcp shim: %v", err)
 	}
@@ -41,8 +45,6 @@ func startTcpToUdpShim(t *testing.T, udpTarget string) int {
 			go bridgeTcpToUdp(tcpConn, udpTarget)
 		}
 	}()
-
-	return ln.Addr().(*net.TCPAddr).Port
 }
 
 func bridgeTcpToUdp(tcpConn net.Conn, udpTarget string) {
@@ -130,9 +132,11 @@ func TestWireguardInboundProxyOverTcp(t *testing.T) {
 	defer remoteWireguardTeardown()
 	log.Info("Remote wireguard peer is up")
 
-	// stand up the TCP->UDP shim in front of the gateway's UDP listener
-	shimTcpPort := startTcpToUdpShim(t, fmt.Sprintf("127.0.0.1:%d", gatewayWireguardPort))
-	log.WithField("tcp_port", shimTcpPort).Info("TCP shim is up")
+	// stand up the TCP->UDP shim in front of the gateway's UDP listener, on the
+	// same port number (the broker reuses the peer endpoint host:port for TCP)
+	gatewayAddr := fmt.Sprintf("127.0.0.1:%d", gatewayWireguardPort)
+	startTcpToUdpShim(t, gatewayAddr, gatewayAddr)
+	log.WithField("addr", gatewayAddr).Info("TCP shim is up")
 
 	// set up internal service (the thing that the broker proxies to)
 	internalServer := gin.Default()
@@ -152,8 +156,8 @@ func TestWireguardInboundProxyOverTcp(t *testing.T) {
 
 	internalServerBaseUrl := fmt.Sprintf("http://%v", internalListener.Addr().String())
 
-	// start network broker with TCP transport enabled. The peer endpoint host
-	// (127.0.0.1) is reused; TcpTransportPort points at the shim.
+	// start network broker with TCP transport enabled. The peer endpoint
+	// host:port (127.0.0.1:gatewayWireguardPort) is reused for the TCP dial.
 	brokerConfig := &pkg.Config{
 		Inbound: pkg.InboundProxyConfig{
 			Wireguard: pkg.WireguardBase{
@@ -166,7 +170,7 @@ func TestWireguardInboundProxyOverTcp(t *testing.T) {
 						Endpoint:   fmt.Sprintf("127.0.0.1:%v", gatewayWireguardPort),
 					},
 				},
-				TcpTransportPort: shimTcpPort,
+				PreferTcpTransport: true,
 			},
 			Allowlist: []pkg.AllowlistItem{
 				{

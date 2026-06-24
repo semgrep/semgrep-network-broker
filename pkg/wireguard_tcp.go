@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/netip"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -361,23 +360,17 @@ func nextBackoff(d time.Duration) time.Duration {
 	return next
 }
 
-// tcpTransportAddress derives the gateway's TCP listener address (host:port)
-// from the configured TCP transport port and the first WireGuard peer that has
-// an endpoint. The host is reused from the peer's resolved endpoint.
+// tcpTransportAddress returns the gateway's TCP address (host:port) for the TCP
+// transport, reusing the first WireGuard peer endpoint as-is. The gateway listens
+// for TCP on the same host:port it uses for UDP.
 func (config *WireguardBase) tcpTransportAddress() (string, error) {
 	for i := range config.Peers {
-		endpoint := config.Peers[i].resolvedEndpoint
-		if endpoint == "" {
-			endpoint = config.Peers[i].Endpoint
+		if config.Peers[i].resolvedEndpoint != "" {
+			return config.Peers[i].resolvedEndpoint, nil
 		}
-		if endpoint == "" {
-			continue
+		if config.Peers[i].Endpoint != "" {
+			return config.Peers[i].Endpoint, nil
 		}
-		host, _, err := net.SplitHostPort(endpoint)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse wireguard peer endpoint %q: %w", endpoint, err)
-		}
-		return net.JoinHostPort(host, strconv.Itoa(config.TcpTransportPort)), nil
 	}
 	return "", fmt.Errorf("tcp transport enabled but no wireguard peer endpoint is configured")
 }

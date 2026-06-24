@@ -89,7 +89,7 @@ func (base *WireguardBase) ResolvePeerEndpoints() error {
 // WireGuard over an outbound TCP connection to the gateway. Peer endpoints must
 // already be resolved (see ResolvePeerEndpoints) before calling this.
 func (config *WireguardBase) newBind() (conn.Bind, error) {
-	if config.TcpTransportPort <= 0 {
+	if !config.PreferTcpTransport {
 		return conn.NewDefaultBind(), nil
 	}
 
