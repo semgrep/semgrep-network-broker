@@ -61,6 +61,24 @@ inbound:
   allowlist: [...]
 ```
 
+### WireGuard over TCP
+
+By default the broker reaches the Semgrep gateway over WireGuard's standard UDP transport. In networks where outbound UDP is blocked but outbound TCP is allowed, you can tunnel WireGuard over TCP by setting `inbound.wireguard.tcpTransportPort` to the gateway's TCP listener port. The broker then dials the gateway over TCP (reusing the peer endpoint's host) and encapsulates each WireGuard datagram as a 2-byte big-endian length prefix followed by the payload. The broker reconnects automatically with bounded backoff if the connection drops.
+
+Leave `tcpTransportPort` unset (or `0`) to keep the default UDP behavior.
+
+Example:
+
+```yaml
+inbound:
+  wireguard:
+    localAddress: ...
+    privateKey: ...
+    peers:
+      - endpoint: ... # the host here is reused for the TCP connection
+    tcpTransportPort: 51821 # connect to the gateway's TCP listener instead of UDP
+```
+
 ### HttpClient
 
 The `httpClient` configuration section modifies the HTTP client used for proxying requests.

@@ -84,6 +84,24 @@ func (base *WireguardBase) ResolvePeerEndpoints() error {
 	return nil
 }
 
+// newBind selects the WireGuard transport. By default it returns the standard
+// UDP bind; when TcpTransportPort is set it returns a bind that encapsulates
+// WireGuard over an outbound TCP connection to the gateway. Peer endpoints must
+// already be resolved (see ResolvePeerEndpoints) before calling this.
+func (config *WireguardBase) newBind() (conn.Bind, error) {
+	if config.TcpTransportPort <= 0 {
+		return conn.NewDefaultBind(), nil
+	}
+
+	address, err := config.tcpTransportAddress()
+	if err != nil {
+		return nil, fmt.Errorf("failed to configure wireguard tcp transport: %w", err)
+	}
+
+	log.WithField("wireguard_tcp_address", address).Info("wireguard.tcp_transport_enabled")
+	return NewWireguardTcpBind(address, nil), nil
+}
+
 func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
 	// ensure config is valid
 	if err := validate.Validate(config); err != nil {
@@ -121,8 +139,14 @@ func (config *WireguardBase) Start() (*netstack.Net, func() error, error) {
 		return nil, nil, fmt.Errorf("failed to create wireguard tun: %v", err)
 	}
 
+	// select the transport: TCP encapsulation if configured, otherwise default UDP
+	bind, err := config.newBind()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	// create wireguard device
-	dev := device.NewDevice(tun, conn.NewDefaultBind(), newLoggerBridge(config.Verbose))
+	dev := device.NewDevice(tun, bind, newLoggerBridge(config.Verbose))
 
 	// apply wireguard configs
 	if err := dev.IpcSet(config.GenerateConfig()); err != nil {
