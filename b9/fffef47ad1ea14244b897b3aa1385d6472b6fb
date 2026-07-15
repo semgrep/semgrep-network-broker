@@ -1,0 +1,25 @@
+pkg/config.go
+  s_9c1ed9632a92ef::t_7073bc6c5bd7c7 845,848
+  s_9c1ed9632a92ef::t_deda20b88de7b4 1016-1017,1020
+  s_9c1ed9632a92ef::t_2e1ea36625a1b6 1155,1158
+README.md
+  s_9c1ed9632a92ef::t_24b2177080b400 298
+  s_9c1ed9632a92ef::t_e939c11ba9239a 204
+  s_9c1ed9632a92ef::t_f9a689d2e42845 250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.14",
+  "base_commit_sha": "b9fffef47ad1ea14244b897b3aa1385d6472b6fb",
+  "prompts": {},
+  "sessions": {
+    "s_9c1ed9632a92ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c5e487d-6615-40b8-a257-1e67438fdbbe",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Caleb Brinkman <caleb@semgrep.com>"
+    }
+  }
+}
