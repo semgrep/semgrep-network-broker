@@ -842,10 +842,10 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// Branches
+			// Branches (GET to list; POST to create a branch)
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 				SetRequestHeaders: headers,
 			},
 			// Get branch
@@ -1013,10 +1013,11 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// list branches (used for branch existence check with filterText)
+			// branches (GET to list / check existence with filterText; POST to
+			// create a branch and for the write-permission check)
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 				SetRequestHeaders: headers,
 			},
 			// pull requests
@@ -1151,10 +1152,10 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// get refs (used for branch existence check)
+			// refs (GET for branch existence check; POST to create a branch)
 			AllowlistItem{
 				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 				SetRequestHeaders: headers,
 			},
 			// get pull requests

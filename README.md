@@ -201,6 +201,7 @@ Adding a `gitlab` field to the config implicitly adds these endpoints to the all
 - POST `https://gitlab.example.com/api/v4/projects/:project/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes`
+- POST `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
 - PUT `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
@@ -246,6 +247,7 @@ Adding a `bitbucket` field to the config implicitly adds these endpoints to the 
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/comments/:comment`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/webhooks`
 - GET `https://bitbucket.example.com/rest/api/latest/projects/:project/webhooks`
+- POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/branches`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/blocker-comments`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/pull-requests/:number/comments`
 - POST `https://bitbucket.example.com/rest/api/latest/projects/:project/repos/:repo/webhooks`
@@ -293,6 +295,7 @@ Adding a `azuredevops` field to the config implicitly adds these endpoints to th
 - GET `https://vsaex.dev.azure.com/:namespace/_apis/groupentitlements`
 - POST `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads`
 - POST `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments`
+- POST `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/refs`
 - POST `https://dev.azure.com/:namespace/:project/_apis/hooks/subscriptions`
 - PUT `https://dev.azure.com/:namespace/:project/_apis/hooks/subscriptions`
 - PATCH `https://dev.azure.com/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads`
