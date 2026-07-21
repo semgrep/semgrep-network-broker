@@ -480,6 +480,12 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// get the authenticated user's membership in an organization
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/user/memberships/orgs/:org").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// PR info
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),

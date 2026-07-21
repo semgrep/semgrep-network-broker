@@ -132,6 +132,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/comments/:comment_id/reactions`
 - GET `https://github.example.com/api/v3/user`
+- GET `https://github.example.com/api/v3/user/memberships/orgs/:org`
 - GET `https://github.example.com/api/v3/user/repos`
 - GET `https://github.example.com/api/v3/users/:user/installation`
 - GET `https://github.example.com/api/v3/users/:user/installation/repositories`
