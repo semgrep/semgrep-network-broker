@@ -13,15 +13,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3.6.1
         with:
           go-version-file: 'go.mod'
           cache: true
       - id: get-buf-version
         run: |
           echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
           version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
           github_token: ${{ github.token }}
@@ -31,19 +31,19 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Setup buf for proto stuff
       - id: get-buf-version
         run: |
           echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
           version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
           github_token: ${{ github.token }}
 
       - name: Run pre-commit hooks
-        uses: pre-commit/action@v3.0.0
+        uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # v3.0.0
         with:
           extra_args: --all-files --verbose
 
@@ -51,11 +51,11 @@ jobs:
     name: Verify generated Protobuf output is up to date
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: get-buf-version
         run: |
           echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
           version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
           github_token: ${{ github.token }}
@@ -68,14 +68,14 @@ jobs:
     name: Check Protobuf backwards compatibility
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: get-buf-version
         run: |
           echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
-      - uses: bufbuild/buf-setup-action@v1
+      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
           version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
           github_token: ${{ github.token }}
-      - uses: bufbuild/buf-breaking-action@v1
+      - uses: bufbuild/buf-breaking-action@c57b3d842a5c3f3b454756ef65305a50a587c5ba # v1.1.4
         with:
           against: "https://github.com/${GITHUB_REPOSITORY}.git#branch=develop"
