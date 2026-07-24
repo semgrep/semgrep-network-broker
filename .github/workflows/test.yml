@@ -31,21 +31,26 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      # Setup buf for proto stuff
-      - id: get-buf-version
-        run: |
-          echo "BUF_VERSION=$(cat .buf-version)" >> "$GITHUB_OUTPUT"
-      - uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          version: ${{ steps.get-buf-version.outputs.BUF_VERSION }}
-          github_token: ${{ github.token }}
-
-      - name: Run pre-commit hooks
-        uses: pre-commit/action@646c83fcd040023954eafda54b4db0192ce70507 # v3.0.0
+          enable-cache: true
+          cache-dependency-glob: .pre-commit-config.yaml
+          version: "0.11.15"
+      - name: Cache pre-commit hook envs
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          extra_args: --all-files --verbose
+          path: ~/.cache/pre-commit
+          key: pre-commit-v1|${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Install pre-commit
+        run: uv tool install pre-commit --with pre-commit-uv
+      # generate-protos (`make protos` → buf generate) is skipped: buf isn't set
+      # up here, and that check is already covered by the proto-check job below.
+      - name: Run pre-commit
+        env:
+          SKIP: generate-protos
+        run: pre-commit run --show-diff-on-failure --color=always --all-files --verbose
 
   proto-check:
     name: Verify generated Protobuf output is up to date
