@@ -1,0 +1,14 @@
+pkg/config.go
+  h_60790185dfaf9f 1081
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "01d62a584d2df9e766876ad23e7fbb2c1737af18",
+  "prompts": {},
+  "humans": {
+    "h_60790185dfaf9f": {
+      "author": "Caleb Brinkman <caleb@semgrep.com>"
+    }
+  }
+}
