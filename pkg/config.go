@@ -1078,7 +1078,7 @@ func PopulateAllowLists(config *Config) error {
 		// permission preflight calls. Unlike the equivalent preflights on the other
 		// providers, Bitbucket Data Center exposes groups only under /admin, and the
 		// point of the broker is a narrow tunnel — a capability check does not justify
-		// putting an administrative endpoint in the on-by-default allowlist. 
+		// putting an administrative endpoint in the on-by-default allowlist.
 
 		if config.Inbound.BitBucket.AllowCodeAccess {
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
