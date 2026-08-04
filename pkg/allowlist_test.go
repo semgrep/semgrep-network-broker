@@ -233,6 +233,68 @@ func TestAllowlistGitLabSubgroupMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "DELETE", "https://gitlab.example.com/group/repo.git/info/refs", false)
 }
 
+func bitBucketAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
+	t.Helper()
+
+	config := &Config{
+		Inbound: InboundProxyConfig{
+			BitBucket: &BitBucket{
+				BaseURL:         "https://bitbucket.example.com/rest/api/latest",
+				AllowCodeAccess: allowCodeAccess,
+			},
+			Allowlist: Allowlist{},
+		},
+	}
+	if err := PopulateAllowLists(config); err != nil {
+		t.Fatalf("PopulateAllowLists: %v", err)
+	}
+
+	return &config.Inbound.Allowlist
+}
+
+// Code Autofix on Bitbucket Data Center writes the fix through the edit-file
+// endpoint and then opens a PR. Both are writes, so both are gated behind
+// allowCodeAccess (matching GitHub's create-pull and GitLab's create-MR).
+func TestAllowlistBitBucketAutofixWrites(t *testing.T) {
+	allowlist := bitBucketAllowlist(t, true)
+
+	const repo = "https://bitbucket.example.com/rest/api/latest/projects/CAL/repos/problems-on-purpose"
+
+	// Write the fix. The `browse/*` wildcard has to span a multi-segment file path.
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/browse/vulnapp/auth.py", true)
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/browse/auth.py", true)
+	// Reading the same path still works.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/browse/vulnapp/auth.py", true)
+
+	// Create the branch the fix commits onto, then open the PR.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/branches", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pull-requests", true)
+
+	// Negative: the write verbs stop at the endpoints above.
+	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/browse/vulnapp/auth.py", false)
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/pull-requests", false)
+
+	// Negative: the permission preflight's admin endpoint is deliberately not
+	// allowlisted. See the note in PopulateAllowLists.
+	assertAllowlistMatch(t, allowlist, "GET", "https://bitbucket.example.com/rest/api/latest/admin/groups", false)
+}
+
+func TestAllowlistBitBucketAutofixWritesRequireCodeAccess(t *testing.T) {
+	allowlist := bitBucketAllowlist(t, false)
+
+	const repo = "https://bitbucket.example.com/rest/api/latest/projects/CAL/repos/problems-on-purpose"
+
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/browse/vulnapp/auth.py", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/browse/vulnapp/auth.py", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pull-requests", false)
+	// Creating a branch mutates the repo, so it is gated too.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/branches", false)
+
+	// Sanity check: the read-only entries on the same paths are unaffected.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pull-requests", true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/branches", true)
+}
+
 func createCombinedAllowlist() *Allowlist {
 	config := &Config{
 		Inbound: InboundProxyConfig{

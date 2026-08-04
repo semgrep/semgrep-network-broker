@@ -1019,11 +1019,11 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// branches (GET to list / check existence with filterText; POST to
-			// create a branch and for the write-permission check)
+			// list branches / check existence with filterText. Creating a branch
+			// (POST) mutates the repo, so it is gated behind allowCodeAccess below.
 			AllowlistItem{
 				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			// pull requests
@@ -1074,12 +1074,19 @@ func PopulateAllowLists(config *Config) error {
 			},
 		)
 
+		// Deliberately absent: GET /admin/groups, which the platform's list-teams
+		// permission preflight calls. Unlike the equivalent preflights on the other
+		// providers, Bitbucket Data Center exposes groups only under /admin, and the
+		// point of the broker is a narrow tunnel — a capability check does not justify
+		// putting an administrative endpoint in the on-by-default allowlist.
+
 		if config.Inbound.BitBucket.AllowCodeAccess {
 			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-				// get contents of file
+				// file contents (GET to read; PUT to write the fix, which is how
+				// Bitbucket Data Center's edit-file endpoint commits a change)
 				AllowlistItem{
 					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/browse/*").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
+					Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
 					SetRequestHeaders: headers,
 				},
 				// update commit build status
@@ -1104,6 +1111,20 @@ func PopulateAllowLists(config *Config) error {
 				AllowlistItem{
 					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// create the branch the fix commits onto. Also the endpoint the
+				// write-permission preflight POSTs to, so that check now reports
+				// "no write access" on a read-only deployment, which is accurate.
+				AllowlistItem{
+					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// create pull request
+				AllowlistItem{
+					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 			)
