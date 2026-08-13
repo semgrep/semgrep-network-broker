@@ -233,6 +233,67 @@ func TestAllowlistGitLabSubgroupMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "DELETE", "https://gitlab.example.com/group/repo.git/info/refs", false)
 }
 
+func gitLabAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
+	t.Helper()
+
+	config := &Config{
+		Inbound: InboundProxyConfig{
+			GitLab: &GitLab{
+				BaseURL:         "https://gitlab.example.com/api/v4",
+				AllowCodeAccess: allowCodeAccess,
+			},
+			Allowlist: Allowlist{},
+		},
+	}
+	if err := PopulateAllowLists(config); err != nil {
+		t.Fatalf("PopulateAllowLists: %v", err)
+	}
+
+	return &config.Inbound.Allowlist
+}
+
+// Code Autofix on GitLab creates a branch, writes the fix through the commits
+// endpoint, and then opens an MR. The project is passed URL-encoded, so
+// `:project` has to match a single segment containing %2F.
+func TestAllowlistGitLabAutofixWrites(t *testing.T) {
+	allowlist := gitLabAllowlist(t, true)
+
+	const project = "https://gitlab.example.com/api/v4/projects/caleb-testing%2Fproblems"
+
+	// Create the branch, commit the fix onto it, then open the MR.
+	assertAllowlistMatch(t, allowlist, "POST", project+"/repository/branches", true)
+	assertAllowlistMatch(t, allowlist, "POST", project+"/repository/commits", true)
+	assertAllowlistMatch(t, allowlist, "POST", project+"/merge_requests", true)
+
+	// Reading the same endpoints still works.
+	assertAllowlistMatch(t, allowlist, "GET", project+"/repository/commits", true)
+	assertAllowlistMatch(t, allowlist, "GET", project+"/merge_requests", true)
+
+	// A numeric project id is the other form the platform sends.
+	assertAllowlistMatch(t, allowlist, "POST", "https://gitlab.example.com/api/v4/projects/123/repository/commits", true)
+
+	// Negative: the write verbs stop at the endpoints above.
+	assertAllowlistMatch(t, allowlist, "DELETE", project+"/repository/commits", false)
+	assertAllowlistMatch(t, allowlist, "PUT", project+"/repository/commits", false)
+	assertAllowlistMatch(t, allowlist, "POST", project+"/repository/files/auth.py", false)
+}
+
+func TestAllowlistGitLabAutofixWritesRequireCodeAccess(t *testing.T) {
+	allowlist := gitLabAllowlist(t, false)
+
+	const project = "https://gitlab.example.com/api/v4/projects/caleb-testing%2Fproblems"
+
+	assertAllowlistMatch(t, allowlist, "POST", project+"/repository/commits", false)
+	assertAllowlistMatch(t, allowlist, "GET", project+"/repository/commits", false)
+	assertAllowlistMatch(t, allowlist, "POST", project+"/merge_requests", false)
+	// Creating a branch mutates the repo, so it is gated too.
+	assertAllowlistMatch(t, allowlist, "POST", project+"/repository/branches", false)
+
+	// Sanity check: the read-only entries on the same paths are unaffected.
+	assertAllowlistMatch(t, allowlist, "GET", project+"/merge_requests", true)
+	assertAllowlistMatch(t, allowlist, "GET", project+"/repository/branches", true)
+}
+
 func bitBucketAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 	t.Helper()
 
