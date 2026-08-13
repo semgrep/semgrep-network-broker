@@ -848,10 +848,11 @@ func PopulateAllowLists(config *Config) error {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			// Branches (GET to list; POST to create a branch)
+			// list branches / check existence. Creating a branch (POST) mutates the
+			// repo, so it is gated behind allowCodeAccess below.
 			AllowlistItem{
 				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 			// Get branch
@@ -906,10 +907,17 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
-				// Commits
+				// create the branch the fix commits onto
+				AllowlistItem{
+					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// Commits (GET to list; POST to create the commit carrying the fix,
+				// which is how Code Autofix writes a change on GitLab)
 				AllowlistItem{
 					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
+					Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 					SetRequestHeaders: headers,
 				},
 				// Compare branches

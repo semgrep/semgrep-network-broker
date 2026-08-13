@@ -202,7 +202,6 @@ Adding a `gitlab` field to the config implicitly adds these endpoints to the all
 - POST `https://gitlab.example.com/api/v4/projects/:project/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes`
-- POST `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
 - PUT `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
@@ -219,6 +218,8 @@ And if `allowCodeAccess` is set, these endpoints are also added to the allowlist
 - GET `https://gitlab.example.com/api/v4/projects/:project/repository/merge_base`
 - GET `https://gitlab.example.com/{:namespace/}+:project/info/refs`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
+- POST `https://gitlab.example.com/api/v4/projects/:project/repository/branches`
+- POST `https://gitlab.example.com/api/v4/projects/:project/repository/commits`
 - POST `https://gitlab.example.com/api/v4/projects/:project/statuses/:commit`
 - POST `https://gitlab.example.com/{:namespace/}+:project/git-receive-pack`
 - POST `https://gitlab.example.com/{:namespace/}+:project/git-upload-pack`
