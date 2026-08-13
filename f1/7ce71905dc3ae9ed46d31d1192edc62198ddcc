@@ -1,0 +1,27 @@
+README.md
+  s_f8599890c91d60::t_f88830e877a4d4 221
+  s_f8599890c91d60::t_0360703cea3961 222
+pkg/allowlist_test.go
+  s_f8599890c91d60::t_13bfa34f5ec9ad 236-288,291-296
+  s_f8599890c91d60::t_9ea595b2842fb0 289-290
+pkg/config.go
+  s_f8599890c91d60::t_05b34cf510f547 916-917,920
+  s_f8599890c91d60::t_3b80dfb21e7771 851-852,855
+  s_f8599890c91d60::t_62af3d986812f2 910-915
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "f17ce71905dc3ae9ed46d31d1192edc62198ddcc",
+  "prompts": {},
+  "sessions": {
+    "s_f8599890c91d60": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a20bded-897a-4284-bb44-fec042d5aaaa",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Caleb Brinkman <caleb@semgrep.com>"
+    }
+  }
+}
