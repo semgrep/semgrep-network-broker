@@ -742,6 +742,14 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
+				// resolve the base branch SHA before creating the autofix branch.
+				// A wildcard, not :ref — ref names span path segments ("heads/main",
+				// "heads/feature/DEV-1/fix") and :ref only matches a single one.
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/ref/*").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
 				// create pull request
 				AllowlistItem{
 					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),

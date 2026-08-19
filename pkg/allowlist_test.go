@@ -233,6 +233,71 @@ func TestAllowlistGitLabSubgroupMatch(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "DELETE", "https://gitlab.example.com/group/repo.git/info/refs", false)
 }
 
+func gitHubAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
+	t.Helper()
+
+	config := &Config{
+		Inbound: InboundProxyConfig{
+			GitHub: &GitHub{
+				BaseURL:         "https://github.example.com/api/v3",
+				AllowCodeAccess: allowCodeAccess,
+			},
+			Allowlist: Allowlist{},
+		},
+	}
+	if err := PopulateAllowLists(config); err != nil {
+		t.Fatalf("PopulateAllowLists: %v", err)
+	}
+
+	return &config.Inbound.Allowlist
+}
+
+// Code Autofix on GitHub resolves the base branch SHA, creates a branch at that
+// SHA, pushes the fix over the git transfer protocol, and opens a PR. The SHA
+// lookup was missing from the allowlist, so the branch was created with the
+// branch name in place of the SHA and GitHub rejected it with a 422.
+func TestAllowlistGitHubAutofixWrites(t *testing.T) {
+	allowlist := gitHubAllowlist(t, true)
+
+	const repo = "https://github.example.com/api/v3/repos/testorg/testrepo"
+
+	// Resolve the base SHA, create the branch at it, push the fix, open the PR.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/main", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/refs", true)
+	assertAllowlistMatch(t, allowlist, "POST", "https://github.example.com/testorg/testrepo/git-receive-pack", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pulls", true)
+
+	// Ref names contain slashes, so the lookup must match across segments.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/feature/DEV-1/fix", true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/tags/v1.2.3", true)
+
+	// Reading the repo (for its default branch) still works.
+	assertAllowlistMatch(t, allowlist, "GET", repo, true)
+
+	// Negative: the ref lookup is read-only, and does not widen /git/refs.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/ref/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/git/ref/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/git/refs/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/refs", false)
+}
+
+// The SHA lookup reads repository contents, so it is gated behind
+// allowCodeAccess alongside the push and the PR create.
+func TestAllowlistGitHubAutofixWritesRequireCodeAccess(t *testing.T) {
+	allowlist := gitHubAllowlist(t, false)
+
+	const repo = "https://github.example.com/api/v3/repos/testorg/testrepo"
+
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "POST", "https://github.example.com/testorg/testrepo/git-receive-pack", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pulls", false)
+
+	// Sanity check: the read-only entries on neighbouring paths are unaffected.
+	assertAllowlistMatch(t, allowlist, "GET", repo, true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/branches/main", true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls", true)
+}
+
 func gitLabAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 	t.Helper()
 
