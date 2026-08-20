@@ -163,6 +163,7 @@ And if `allowCodeAccess` is set, these endpoints are also added to the allowlist
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/commits`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/contents`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/contents/*`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/git/ref/*`
 - POST `https://github.example.com/:owner/:repo/git-receive-pack`
 - POST `https://github.example.com/:owner/:repo/git-upload-pack`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
