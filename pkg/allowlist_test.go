@@ -253,44 +253,78 @@ func gitHubAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 }
 
 // Code Autofix on GitHub resolves the base branch SHA, creates a branch at that
-// SHA, pushes the fix over the git transfer protocol, and opens a PR. The SHA
-// lookup was missing from the allowlist, so the branch was created with the
-// branch name in place of the SHA and GitHub rejected it with a 422.
+// SHA, writes the fix as a commit through the Git database API, and opens a PR.
+// The commit is assembled object by object rather than pushed over the git
+// transfer protocol, so every leg needs its own allowlist entry — a subset gets
+// partway through and fails mid-commit.
 func TestAllowlistGitHubAutofixWrites(t *testing.T) {
 	allowlist := gitHubAllowlist(t, true)
 
 	const repo = "https://github.example.com/api/v3/repos/testorg/testrepo"
+	const sha = "fb82f3624fb363332009bd8a3be1c681877e5aaf"
 
-	// Resolve the base SHA, create the branch at it, push the fix, open the PR.
+	// Resolve the base SHA and create the branch at it.
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/main", true)
 	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/refs", true)
-	assertAllowlistMatch(t, allowlist, "POST", "https://github.example.com/testorg/testrepo/git-receive-pack", true)
+
+	// Commit the fix, then open the PR.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/commits/"+sha, true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/blobs", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/trees", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/commits", true)
+	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/git/refs/heads/semgrep-autofix/1787673035", true)
 	assertAllowlistMatch(t, allowlist, "POST", repo+"/pulls", true)
 
-	// Ref names contain slashes, so the lookup must match across segments.
+	// Ref names contain slashes, so both ref entries must match across segments.
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/feature/DEV-1/fix", true)
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/tags/v1.2.3", true)
+	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/git/refs/heads/feature/DEV-1/fix", true)
+
+	// The Git database commit read is a different endpoint from the REST
+	// list-commits one. Both are allowed, by separate entries — the presence of
+	// /commits is not what admits /git/commits/:sha.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/commits", true)
 
 	// Reading the repo (for its default branch) still works.
 	assertAllowlistMatch(t, allowlist, "GET", repo, true)
 
+	// Not part of this flow — asserted here because this is the only coverage
+	// the git transfer protocol entries have, and they share the same gate.
+	assertAllowlistMatch(t, allowlist, "POST", "https://github.example.com/testorg/testrepo/git-receive-pack", true)
+
 	// Negative: the ref lookup is read-only, and does not widen /git/refs.
 	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/ref/heads/main", false)
 	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/git/ref/heads/main", false)
-	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/git/refs/heads/main", false)
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/refs", false)
+
+	// Negative: moving a ref is the only write /git/refs/* admits. Deleting a
+	// branch is not part of the flow.
+	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/git/refs/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/git/refs/heads/main", false)
+
+	// Negative: the Git database entries are single-method.
+	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/git/commits/"+sha, false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/blobs", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/trees", false)
 }
 
-// The SHA lookup reads repository contents, so it is gated behind
-// allowCodeAccess alongside the push and the PR create.
+// Every leg of the write path reads or writes repository contents, so all of
+// them are gated behind allowCodeAccess.
 func TestAllowlistGitHubAutofixWritesRequireCodeAccess(t *testing.T) {
 	allowlist := gitHubAllowlist(t, false)
 
 	const repo = "https://github.example.com/api/v3/repos/testorg/testrepo"
+	const sha = "fb82f3624fb363332009bd8a3be1c681877e5aaf"
 
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/ref/heads/main", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/git/commits/"+sha, false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/blobs", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/trees", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/git/commits", false)
+	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/git/refs/heads/semgrep-autofix/1787673035", false)
 	assertAllowlistMatch(t, allowlist, "POST", "https://github.example.com/testorg/testrepo/git-receive-pack", false)
 	assertAllowlistMatch(t, allowlist, "POST", repo+"/pulls", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/commits", false)
 
 	// Sanity check: the read-only entries on neighbouring paths are unaffected.
 	assertAllowlistMatch(t, allowlist, "GET", repo, true)
@@ -419,6 +453,76 @@ func TestAllowlistBitBucketAutofixWritesRequireCodeAccess(t *testing.T) {
 	// Sanity check: the read-only entries on the same paths are unaffected.
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/pull-requests", true)
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/branches", true)
+}
+
+func azureDevOpsAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
+	t.Helper()
+
+	config := &Config{
+		Inbound: InboundProxyConfig{
+			AzureDevOps: &AzureDevOps{
+				BaseURL:         "https://dev.azure.com",
+				AllowCodeAccess: allowCodeAccess,
+			},
+			Allowlist: Allowlist{},
+		},
+	}
+	if err := PopulateAllowLists(config); err != nil {
+		t.Fatalf("PopulateAllowLists: %v", err)
+	}
+
+	return &config.Inbound.Allowlist
+}
+
+// Code Autofix on Azure DevOps resolves the base SHA from the refs API, creates
+// the branch as a ref update, then writes the fix as a push — Azure DevOps has
+// no create-commit endpoint — and opens a PR. Creating the branch is allowed by
+// the on-by-default list, so a gap in the later legs strands the flow with the
+// branch already created rather than failing up front.
+func TestAllowlistAzureDevOpsAutofixWrites(t *testing.T) {
+	allowlist := azureDevOpsAllowlist(t, true)
+
+	const repo = "https://dev.azure.com/testorg/testproject/_apis/git/repositories/testrepo"
+
+	// Resolve the base SHA, create the branch at it.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/refs?filter=heads/main", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/refs", true)
+
+	// Decide add-vs-edit per file, commit the fix as a push, open the PR.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/items?path=/vulnapp/auth.py", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pushes", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pullRequests", true)
+
+	// Reading the repo (for its default branch) still works.
+	assertAllowlistMatch(t, allowlist, "GET", repo, true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pullRequests", true)
+
+	// Negative: the write verbs stop at the endpoints above.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pushes", false)
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/pushes", false)
+	assertAllowlistMatch(t, allowlist, "DELETE", repo+"/refs", false)
+	assertAllowlistMatch(t, allowlist, "PATCH", repo+"/pullRequests", false)
+	assertAllowlistMatch(t, allowlist, "PUT", repo+"/items?path=/vulnapp/auth.py", false)
+}
+
+func TestAllowlistAzureDevOpsAutofixWritesRequireCodeAccess(t *testing.T) {
+	allowlist := azureDevOpsAllowlist(t, false)
+
+	const repo = "https://dev.azure.com/testorg/testproject/_apis/git/repositories/testrepo"
+
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/items?path=/vulnapp/auth.py", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pushes", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pullRequests", false)
+
+	// Sanity check: the read-only entries on the same paths are unaffected.
+	assertAllowlistMatch(t, allowlist, "GET", repo, true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/refs?filter=heads/main", true)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pullRequests", true)
+
+	// Creating a branch is on by default here, as it is on GitHub, while GitLab
+	// and Bitbucket Data Center gate it. Asserted so that difference is a
+	// deliberate, visible choice rather than something nobody checked.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/refs", true)
 }
 
 func createCombinedAllowlist() *Allowlist {

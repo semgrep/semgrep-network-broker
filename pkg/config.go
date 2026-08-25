@@ -750,6 +750,45 @@ func PopulateAllowLists(config *Config) error {
 					Methods:           ParseHttpMethods([]string{"GET"}),
 					SetRequestHeaders: headers,
 				},
+				// Code Autofix commits on GitHub through the Git database API, not
+				// by pushing over the git transfer protocol. A commit is assembled
+				// from separate objects, so the next five entries are one unit:
+				// allowlisting a subset fails partway through, mid-commit.
+				//
+				// read the parent commit for its tree. Not the same endpoint as
+				// /repos/:owner/:repo/commits above — that one lists commits, and
+				// allowing it does not admit this.
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits/:sha").String(),
+					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// upload each changed file
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/blobs").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// build the tree the commit will point at
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/trees").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// create the commit
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// move the autofix branch to the new commit. A wildcard for the
+				// same reason as git/ref/* above, and the autofix branch itself
+				// spans segments ("semgrep-autofix/1787673035").
+				AllowlistItem{
+					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs/*").String(),
+					Methods:           ParseHttpMethods([]string{"PATCH"}),
+					SetRequestHeaders: headers,
+				},
 				// create pull request
 				AllowlistItem{
 					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
@@ -1280,6 +1319,22 @@ func PopulateAllowLists(config *Config) error {
 				AllowlistItem{
 					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/pullrequests/:number").String(),
 					Methods:           ParseHttpMethods([]string{"GET"}),
+					SetRequestHeaders: headers,
+				},
+				// commit the fix. Azure DevOps has no create-commit endpoint: a
+				// commit is written as a push, with refUpdates naming the branch,
+				// which is why no branch appears in the path.
+				AllowlistItem{
+					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pushes").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
+					SetRequestHeaders: headers,
+				},
+				// create pull request. A separate entry rather than adding POST to
+				// the read-only pullRequests entry above, so opening a PR stays
+				// gated as it is on the other three providers.
+				AllowlistItem{
+					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
+					Methods:           ParseHttpMethods([]string{"POST"}),
 					SetRequestHeaders: headers,
 				},
 			)
