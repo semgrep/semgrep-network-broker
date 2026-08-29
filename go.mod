@@ -16,7 +16,7 @@ require (
 	github.com/whuang8/redactrus v1.0.2
 	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/dealancer/validate.v2 v2.1.0
 )
 
