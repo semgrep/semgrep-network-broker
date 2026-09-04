@@ -1,5 +1,7 @@
 # semgrep-network-broker
 
+See [AGENTS.md](AGENTS.md) for development conventions and validation commands.
+
 **NOTE:** These docs are in-progress. Feel free to direct any questions / feedback / improvements to your private channel on the Semgrep slack!
 
 The Semgrep Network Broker facilitates secure access between Semgrep and a private network.
