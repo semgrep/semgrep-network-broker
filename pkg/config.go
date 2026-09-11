@@ -1121,11 +1121,6 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 			Methods:           ParseHttpMethods([]string{"GET"}),
 			SetRequestHeaders: headers,
 		},
-		AllowlistItem{
-			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs").String(),
-			Methods:           ParseHttpMethods([]string{"POST"}),
-			SetRequestHeaders: headers,
-		},
 	)
 
 	if scm.allowCodeAccess {
@@ -1201,6 +1196,12 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 			// create the commit
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create the branch the fix commits onto
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
@@ -1691,10 +1692,11 @@ func buildAzureDevOpsAllowlist(scm scmInstance) (Allowlist, error) {
 			Methods:           ParseHttpMethods([]string{"GET"}),
 			SetRequestHeaders: headers,
 		},
-		// refs (GET for branch existence check; POST to create a branch)
+		// list refs / check existence with filter. Creating a branch (POST)
+		// mutates the repo, so it is gated behind allowCodeAccess below.
 		AllowlistItem{
 			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
-			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			Methods:           ParseHttpMethods([]string{"GET"}),
 			SetRequestHeaders: headers,
 		},
 		// get pull requests
@@ -1796,6 +1798,12 @@ func buildAzureDevOpsAllowlist(scm scmInstance) (Allowlist, error) {
 			// gated as it is on the other three providers.
 			AllowlistItem{
 				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create the branch the fix commits onto
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
 				SetRequestHeaders: headers,
 			},
