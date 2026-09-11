@@ -476,9 +476,8 @@ func azureDevOpsAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 
 // Code Autofix on Azure DevOps resolves the base SHA from the refs API, creates
 // the branch as a ref update, then writes the fix as a push — Azure DevOps has
-// no create-commit endpoint — and opens a PR. Creating the branch is allowed by
-// the on-by-default list, so a gap in the later legs strands the flow with the
-// branch already created rather than failing up front.
+// no create-commit endpoint — and opens a PR. Every leg reads or writes
+// repository contents, so all of them require allowCodeAccess.
 func TestAllowlistAzureDevOpsAutofixWrites(t *testing.T) {
 	allowlist := azureDevOpsAllowlist(t, true)
 
@@ -519,10 +518,8 @@ func TestAllowlistAzureDevOpsAutofixWritesRequireCodeAccess(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/refs?filter=heads/main", true)
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/pullRequests", true)
 
-	// Creating a branch is on by default here, as it is on GitHub, while GitLab
-	// and Bitbucket Data Center gate it. Asserted so that difference is a
-	// deliberate, visible choice rather than something nobody checked.
-	assertAllowlistMatch(t, allowlist, "POST", repo+"/refs", true)
+	// Creating a branch mutates the repo, so it is gated too.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/refs", false)
 }
 
 func createCombinedAllowlist() *Allowlist {
