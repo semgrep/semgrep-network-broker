@@ -19,7 +19,6 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
-	"golang.zx2c4.com/wireguard/device"
 )
 
 const SemgrepHostnameEnvVar = "SEMGREP_HOSTNAME"
@@ -28,22 +27,17 @@ const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
 const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
 const PrivateKeyPathEnvVar = PrivateKeyEnvVar + "_PATH"
 
-// WireguardPrivateKeySize is the length of a WireGuard (Curve25519) private key in bytes.
-const WireguardPrivateKeySize = device.NoisePrivateKeySize
+// WireguardPrivateKeySize is the length of a WireGuard private key in bytes (44 characters in base64).
+const WireguardPrivateKeySize = 32
 
-// validateWireguardPrivateKey checks that a private key is a whole number of WireGuard keys.
-// Exactly one key (32 bytes, 44 base64 characters) is the normal case. Older brokers could be
-// configured with several keys concatenated together (see GenerateConfig), so any positive
-// multiple of the key size is still accepted. An empty key is not an error here: it is caught
-// by struct validation when the WireGuard tunnel is started.
+// validateWireguardPrivateKey rejects keys that are not a whole number of WireGuard keys.
+// Legacy concatenated multi-key values (see GenerateConfig) are therefore still accepted.
+// An empty key is left to struct validation when the tunnel starts.
 func validateWireguardPrivateKey(key SensitiveBase64String, source string) error {
-	if len(key) == 0 || len(key)%WireguardPrivateKeySize == 0 {
-		return nil
+	if len(key)%WireguardPrivateKeySize != 0 {
+		return fmt.Errorf("invalid WireGuard private key from %s: expected 32 bytes (44 base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'", source, len(key))
 	}
-	return fmt.Errorf(
-		"invalid WireGuard private key from %s: expected %d bytes (%d base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'",
-		source, WireguardPrivateKeySize, base64.StdEncoding.EncodedLen(WireguardPrivateKeySize), len(key),
-	)
+	return nil
 }
 
 // loadPrivateKeyFromEnv returns the base64 private key supplied via the environment, if any,
