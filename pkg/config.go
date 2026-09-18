@@ -437,909 +437,1004 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	return config, nil
 }
 
+type scmType string
+
+const (
+	scmGitHub      scmType = "github"
+	scmGitLab      scmType = "gitlab"
+	scmBitBucket   scmType = "bitbucket"
+	scmAzureDevOps scmType = "azuredevops"
+)
+
+type scmInstance struct {
+	typ             scmType
+	baseURL         string
+	token           string
+	allowCodeAccess bool
+}
+
+// Must not mutate config: PopulateAllowLists runs more than once against the same config
+// and appends to the allowlist each time. Order sets allowlist precedence, since
+// Allowlist.FindMatch returns the first match.
+func (config *InboundProxyConfig) scmInstances() []scmInstance {
+	var instances []scmInstance
+
+	if config.GitHub != nil {
+		instances = append(instances, scmInstance{
+			typ:             scmGitHub,
+			baseURL:         config.GitHub.BaseURL,
+			token:           config.GitHub.Token,
+			allowCodeAccess: config.GitHub.AllowCodeAccess,
+		})
+	}
+
+	if config.GitLab != nil {
+		instances = append(instances, scmInstance{
+			typ:             scmGitLab,
+			baseURL:         config.GitLab.BaseURL,
+			token:           config.GitLab.Token,
+			allowCodeAccess: config.GitLab.AllowCodeAccess,
+		})
+	}
+
+	if config.BitBucket != nil {
+		instances = append(instances, scmInstance{
+			typ:             scmBitBucket,
+			baseURL:         config.BitBucket.BaseURL,
+			token:           config.BitBucket.Token,
+			allowCodeAccess: config.BitBucket.AllowCodeAccess,
+		})
+	}
+
+	if config.AzureDevOps != nil {
+		instances = append(instances, scmInstance{
+			typ:             scmAzureDevOps,
+			baseURL:         config.AzureDevOps.BaseURL,
+			token:           config.AzureDevOps.Token,
+			allowCodeAccess: config.AzureDevOps.AllowCodeAccess,
+		})
+	}
+
+	return instances
+}
+
 func PopulateAllowLists(config *Config) error {
-	if config.Inbound.GitHub != nil {
-		gitHub := config.Inbound.GitHub
-
-		gitHubBaseUrl, err := url.Parse(gitHub.BaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to parse github base URL: %v", err)
-		}
-
-		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
-		// which requests resources which don't have an api suffix, e.g. /api/v3/
-		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
-		githubRootUrl, err := url.Parse(gitHubBaseUrl.Scheme + "://" + gitHubBaseUrl.Host)
-		if err != nil {
-			return fmt.Errorf("failed to build github root URL: %v", err)
-		}
-
-		var headers map[string]string
-		if gitHub.Token != "" {
-			headers = map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %v", gitHub.Token),
-			}
-		} else {
-			headers = map[string]string{}
-		}
-
-		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-			// repo info
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/user").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/user/repos").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get the authenticated user's membership in an organization
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/user/memberships/orgs/:org").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// PR info
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// post PR comment
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// get PR comment reactions
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id/reactions").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// list branches
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get branch
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches/:branch").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// post issue comment
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// list organizations
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/organizations").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get an organization
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// check app installation for an org
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// check repos for an org
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/repos").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// alternative: check repos for an installation
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/installation/repositories").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// check app installation for a personal account
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// check repo installation for a personal account
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/users/:user/installation/repositories").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// initiate app installation
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app-manifests/:code/conversions").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// get app installation
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app/installations/:id/access_tokens").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/actions/secrets/SEMGREP_APP_TOKEN").String(),
-				Methods:           ParseHttpMethods([]string{"PUT"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/actions/secrets/public-key").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/.github/workflows/semgrep.yml").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/installation").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app/hook/config").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			// list and get webhook deliveries for the GitHub App
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries/:delivery_id").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs/:check_run_id").String(),
-				Methods:           ParseHttpMethods([]string{"PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/compare/:basehead").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id").String(),
-				Methods:           ParseHttpMethods([]string{"PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id").String(),
-				Methods:           ParseHttpMethods([]string{"PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams/:team_slug/members").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/members").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/users/:username").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id").String(),
-				Methods:           ParseHttpMethods([]string{"DELETE", "PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			// list and get deliveries for an organization webhook
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries/:delivery_id").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/statuses/:commit").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/collaborators/:username/permission").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
+	for _, scm := range config.Inbound.scmInstances() {
+		var (
+			allowlist Allowlist
+			err       error
 		)
 
-		if config.Inbound.GitHub.AllowCodeAccess {
-			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// get contents of file
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/*").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// Commits
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/commits").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// discover refs
-				AllowlistItem{
-					URL:               githubRootUrl.JoinPath("/:owner/:repo/info/refs").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// download repo contents
-				AllowlistItem{
-					URL:               githubRootUrl.JoinPath("/:owner/:repo/git-upload-pack").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// push repo contents
-				AllowlistItem{
-					URL:               githubRootUrl.JoinPath("/:owner/:repo/git-receive-pack").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// resolve the base branch SHA before creating the autofix branch.
-				// A wildcard, not :ref — ref names span path segments ("heads/main",
-				// "heads/feature/DEV-1/fix") and :ref only matches a single one.
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/ref/*").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// Code Autofix commits on GitHub through the Git database API, not
-				// by pushing over the git transfer protocol. A commit is assembled
-				// from separate objects, so the next five entries are one unit:
-				// allowlisting a subset fails partway through, mid-commit.
-				//
-				// read the parent commit for its tree. Not the same endpoint as
-				// /repos/:owner/:repo/commits above — that one lists commits, and
-				// allowing it does not admit this.
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits/:sha").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// upload each changed file
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/blobs").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// build the tree the commit will point at
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/trees").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// create the commit
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// move the autofix branch to the new commit. A wildcard for the
-				// same reason as git/ref/* above, and the autofix branch itself
-				// spans segments ("semgrep-autofix/1787673035").
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs/*").String(),
-					Methods:           ParseHttpMethods([]string{"PATCH"}),
-					SetRequestHeaders: headers,
-				},
-				// create pull request
-				AllowlistItem{
-					URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-			)
+		switch scm.typ {
+		case scmGitHub:
+			allowlist, err = buildGitHubAllowlist(scm)
+		case scmGitLab:
+			allowlist, err = buildGitLabAllowlist(scm)
+		case scmBitBucket:
+			allowlist, err = buildBitBucketAllowlist(scm)
+		case scmAzureDevOps:
+			allowlist, err = buildAzureDevOpsAllowlist(scm)
+		default:
+			return fmt.Errorf("unknown scm type %q", scm.typ)
 		}
-	}
-
-	if config.Inbound.GitLab != nil {
-		gitLab := config.Inbound.GitLab
-
-		gitLabBaseUrl, err := url.Parse(gitLab.BaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to parse gitlab base URL: %v", err)
-		}
-
-		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
-		// which requests resources which don't have an api suffix, e.g. /api/v4/
-		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
-		gitLabRootUrl, err := url.Parse(gitLabBaseUrl.Scheme + "://" + gitLabBaseUrl.Host)
-		if err != nil {
-			return fmt.Errorf("failed to build gitlab root URL: %v", err)
-		}
-
-		var headers map[string]string
-		if gitLab.Token != "" {
-			headers = map[string]string{
-				"PRIVATE-TOKEN": gitLab.Token,
-			}
-		} else {
-			headers = map[string]string{}
-		}
-
-		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-			// Group webhooks
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks/:hook").String(),
-				Methods:           ParseHttpMethods([]string{"DELETE"}),
-				SetRequestHeaders: headers,
-			},
-			// List all members of a group
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/members/all").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Namespace info
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/namespaces/:namespace").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// repo info
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Repo webhooks
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks/:hook").String(),
-				Methods:           ParseHttpMethods([]string{"DELETE"}),
-				SetRequestHeaders: headers,
-			},
-			// Get a group member
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/members/all/:user").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Get a repo member
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/members/all/:user").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// MR info
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// MR versions
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/versions").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Projects
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/:entity_type/:namespace/projects").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// list branches / check existence. Creating a branch (POST) mutates the
-			// repo, so it is gated behind allowCodeAccess below.
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Get branch
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches/:branch").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// post MR comment
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			// post MR comment reply
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// update MR comment
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note").String(),
-				Methods:           ParseHttpMethods([]string{"PUT"}),
-				SetRequestHeaders: headers,
-			},
-			// resolve MR comment
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion").String(),
-				Methods:           ParseHttpMethods([]string{"PUT"}),
-				SetRequestHeaders: headers,
-			},
-			// Get reactions to comments
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Get scm token info
-			AllowlistItem{
-				URL:               gitLabBaseUrl.JoinPath("/personal_access_tokens/self").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-		)
-
-		if config.Inbound.GitLab.AllowCodeAccess {
-			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-				// get contents of file
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/*").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// create the branch the fix commits onto
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// Commits (GET to list; POST to create the commit carrying the fix,
-				// which is how Code Autofix writes a change on GitLab)
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
-					Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-					SetRequestHeaders: headers,
-				},
-				// Compare branches
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/compare").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// get merge base
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/merge_base").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// Update commit status
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// discover refs ({:namespace/}+ requires one or more non-empty namespace
-				// segments, so GitLab subgroups of any depth match without admitting
-				// double-slash paths). String-concatenated rather than JoinPath'd
-				// because url.URL serialization percent-encodes `{` and `}`, which the
-				// URL Pattern parser would then reject.
-				AllowlistItem{
-					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/info/refs",
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// download project contents
-				AllowlistItem{
-					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-upload-pack",
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// push project contents
-				AllowlistItem{
-					URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-receive-pack",
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// create merge request
-				AllowlistItem{
-					URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-			)
-		}
-	}
-
-	if config.Inbound.BitBucket != nil {
-		bitBucket := config.Inbound.BitBucket
-
-		bitBucketBaseUrl, err := url.Parse(bitBucket.BaseURL)
 
 		if err != nil {
-			return fmt.Errorf("failed to parse bitbucket base URL: %v", err)
+			return err
 		}
 
-		// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
-		// which requests resources which don't have the typical `/rest/api/latest/scm/` api suffix
-		// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
-		bitBucketRootUrl, err := url.Parse(bitBucketBaseUrl.Scheme + "://" + bitBucketBaseUrl.Host)
-		if err != nil {
-			return fmt.Errorf("failed to build bitbucket root URL: %v", err)
-		}
-
-		var headers map[string]string
-		if bitBucket.Token != "" {
-			headers = map[string]string{
-				"Authorization": fmt.Sprintf("Bearer %v", bitBucket.Token),
-			}
-		} else {
-			headers = map[string]string{}
-		}
-
-		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-			// version information and other application properties
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/application-properties").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// project info
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get repos
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// repo info
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// default branch
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/default-branch").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// list branches / check existence with filterText. Creating a branch
-			// (POST) mutates the repo, so it is gated behind allowCodeAccess below.
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// pull requests
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// post PR comment
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// get and update PR comment
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments/:comment").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
-				SetRequestHeaders: headers,
-			},
-			// post blockerPR comment
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/blocker-comments").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			// repository webhooks
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks/:webhook").String(),
-				Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
-				SetRequestHeaders: headers,
-			},
-			// namespace webhooks
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/webhooks").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/webhooks/:webhook").String(),
-				Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
-				SetRequestHeaders: headers,
-			},
-		)
-
-		// Deliberately absent: GET /admin/groups, which the platform's list-teams
-		// permission preflight calls. Unlike the equivalent preflights on the other
-		// providers, Bitbucket Data Center exposes groups only under /admin, and the
-		// point of the broker is a narrow tunnel — a capability check does not justify
-		// putting an administrative endpoint in the on-by-default allowlist.
-
-		if config.Inbound.BitBucket.AllowCodeAccess {
-			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-				// file contents (GET to read; PUT to write the fix, which is how
-				// Bitbucket Data Center's edit-file endpoint commits a change)
-				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/browse/*").String(),
-					Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
-					SetRequestHeaders: headers,
-				},
-				// update commit build status
-				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits/:commit/builds").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// discover refs
-				AllowlistItem{
-					URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/info/refs").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// download repo contents
-				AllowlistItem{
-					URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/git-upload-pack").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// get commits
-				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// create the branch the fix commits onto. Also the endpoint the
-				// write-permission preflight POSTs to, so that check now reports
-				// "no write access" on a read-only deployment, which is accurate.
-				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// create pull request
-				AllowlistItem{
-					URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-			)
-		}
-	}
-
-	if config.Inbound.AzureDevOps != nil {
-		azureDevOps := config.Inbound.AzureDevOps
-
-		azureDevOpsBaseUrl, err := url.Parse(azureDevOps.BaseURL)
-		if err != nil {
-			return fmt.Errorf("failed to parse azure devops base URL: %v", err)
-		}
-
-		vsaexBaseUrl := strings.Replace(azureDevOps.BaseURL, "dev.azure.com", "vsaex.dev.azure.com", 1)
-		vsaexUrl, err := url.Parse(vsaexBaseUrl)
-		if err != nil {
-			return fmt.Errorf("failed to parse azure devops vsaex base URL: %v", err)
-		}
-
-		var headers map[string]string
-		if azureDevOps.Token != "" {
-			headers = map[string]string{
-				"Authorization": fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(azureDevOps.Token))),
-			}
-		} else {
-			headers = map[string]string{}
-		}
-
-		config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-			// Check organization access
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/connectionData").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// Namespace info
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/projects/:project").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get repos
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// repo info
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// refs (GET for branch existence check; POST to create a branch)
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			// get pull requests
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get pull request iterations
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// get pull request iteration changes
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations/:iterationId/changes").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-			// post and update PR comment
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads").String(),
-				Methods:           ParseHttpMethods([]string{"POST", "PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			// post and update PR comment reply
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments").String(),
-				Methods:           ParseHttpMethods([]string{"POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments/:commentId").String(),
-				Methods:           ParseHttpMethods([]string{"PATCH"}),
-				SetRequestHeaders: headers,
-			},
-			// namespace webhooks
-			AllowlistItem{
-				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/hooks/subscriptions").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
-				SetRequestHeaders: headers,
-			},
-			// list teams
-			AllowlistItem{
-				URL:               vsaexUrl.JoinPath("/:namespace/_apis/groupentitlements").String(),
-				Methods:           ParseHttpMethods([]string{"GET"}),
-				SetRequestHeaders: headers,
-			},
-		)
-
-		if config.Inbound.AzureDevOps.AllowCodeAccess {
-			config.Inbound.Allowlist = append(config.Inbound.Allowlist,
-				// get file content
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/items").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// update commit status
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/commits/:commit/statuses").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// discover refs
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_git/:repo/info/refs").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// download repo contents
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_git/:repo/git-upload-pack").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// get pull request
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/pullrequests/:number").String(),
-					Methods:           ParseHttpMethods([]string{"GET"}),
-					SetRequestHeaders: headers,
-				},
-				// commit the fix. Azure DevOps has no create-commit endpoint: a
-				// commit is written as a push, with refUpdates naming the branch,
-				// which is why no branch appears in the path.
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pushes").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-				// create pull request. A separate entry rather than adding POST to
-				// the read-only pullRequests entry above, so opening a PR stays
-				// gated as it is on the other three providers.
-				AllowlistItem{
-					URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
-					Methods:           ParseHttpMethods([]string{"POST"}),
-					SetRequestHeaders: headers,
-				},
-			)
-		}
+		config.Inbound.Allowlist = append(config.Inbound.Allowlist, allowlist...)
 	}
 
 	return nil
+}
+
+func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
+	var allowlist Allowlist
+
+	gitHubBaseUrl, err := url.Parse(scm.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse github base URL: %v", err)
+	}
+
+	// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
+	// which requests resources which don't have an api suffix, e.g. /api/v3/
+	// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
+	githubRootUrl, err := url.Parse(gitHubBaseUrl.Scheme + "://" + gitHubBaseUrl.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build github root URL: %v", err)
+	}
+
+	var headers map[string]string
+	if scm.token != "" {
+		headers = map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %v", scm.token),
+		}
+	} else {
+		headers = map[string]string{}
+	}
+
+	allowlist = append(allowlist,
+		// repo info
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/user").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/user/repos").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get the authenticated user's membership in an organization
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/user/memberships/orgs/:org").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// PR info
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// post PR comment
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// get PR comment reactions
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id/reactions").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// list branches
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get branch
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/branches/:branch").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// post issue comment
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// list organizations
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/organizations").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get an organization
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// check app installation for an org
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/installation").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// check repos for an org
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/repos").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// alternative: check repos for an installation
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/installation/repositories").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// check app installation for a personal account
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/users/:user/installation").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// check repo installation for a personal account
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/users/:user/installation/repositories").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// initiate app installation
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app-manifests/:code/conversions").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// get app installation
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app/installations/:id/access_tokens").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/actions/secrets/SEMGREP_APP_TOKEN").String(),
+			Methods:           ParseHttpMethods([]string{"PUT"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:org/:repo/actions/secrets/public-key").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/.github/workflows/semgrep.yml").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/installation").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app/hook/config").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		// list and get webhook deliveries for the GitHub App
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/app/hook/deliveries/:delivery_id").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/check-runs/:check_run_id").String(),
+			Methods:           ParseHttpMethods([]string{"PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/compare/:basehead").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id").String(),
+			Methods:           ParseHttpMethods([]string{"PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/comments/:comment_id").String(),
+			Methods:           ParseHttpMethods([]string{"PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments/:comment_id/replies").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/teams/:team_slug/members").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/members").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/users/:username").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id").String(),
+			Methods:           ParseHttpMethods([]string{"DELETE", "PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		// list and get deliveries for an organization webhook
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/orgs/:org/hooks/:hook_id/deliveries/:delivery_id").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/statuses/:commit").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/collaborators/:username/permission").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+	)
+
+	if scm.allowCodeAccess {
+		allowlist = append(allowlist,
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// get contents of file
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/contents/*").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Commits
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/commits").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// discover refs
+			AllowlistItem{
+				URL:               githubRootUrl.JoinPath("/:owner/:repo/info/refs").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// download repo contents
+			AllowlistItem{
+				URL:               githubRootUrl.JoinPath("/:owner/:repo/git-upload-pack").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// push repo contents
+			AllowlistItem{
+				URL:               githubRootUrl.JoinPath("/:owner/:repo/git-receive-pack").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// resolve the base branch SHA before creating the autofix branch.
+			// A wildcard, not :ref — ref names span path segments ("heads/main",
+			// "heads/feature/DEV-1/fix") and :ref only matches a single one.
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/ref/*").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Code Autofix commits on GitHub through the Git database API, not
+			// by pushing over the git transfer protocol. A commit is assembled
+			// from separate objects, so the next five entries are one unit:
+			// allowlisting a subset fails partway through, mid-commit.
+			//
+			// read the parent commit for its tree. Not the same endpoint as
+			// /repos/:owner/:repo/commits above — that one lists commits, and
+			// allowing it does not admit this.
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits/:sha").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// upload each changed file
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/blobs").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// build the tree the commit will point at
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/trees").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create the commit
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/commits").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// move the autofix branch to the new commit. A wildcard for the
+			// same reason as git/ref/* above, and the autofix branch itself
+			// spans segments ("semgrep-autofix/1787673035").
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/git/refs/*").String(),
+				Methods:           ParseHttpMethods([]string{"PATCH"}),
+				SetRequestHeaders: headers,
+			},
+			// create pull request
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
+	return allowlist, nil
+}
+
+func buildGitLabAllowlist(scm scmInstance) (Allowlist, error) {
+	var allowlist Allowlist
+
+	gitLabBaseUrl, err := url.Parse(scm.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse gitlab base URL: %v", err)
+	}
+
+	// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
+	// which requests resources which don't have an api suffix, e.g. /api/v4/
+	// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
+	gitLabRootUrl, err := url.Parse(gitLabBaseUrl.Scheme + "://" + gitLabBaseUrl.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build gitlab root URL: %v", err)
+	}
+
+	var headers map[string]string
+	if scm.token != "" {
+		headers = map[string]string{
+			"PRIVATE-TOKEN": scm.token,
+		}
+	} else {
+		headers = map[string]string{}
+	}
+
+	allowlist = append(allowlist,
+		// Group webhooks
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks/:hook").String(),
+			Methods:           ParseHttpMethods([]string{"DELETE"}),
+			SetRequestHeaders: headers,
+		},
+		// List all members of a group
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/members/all").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Namespace info
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/namespaces/:namespace").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// repo info
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Repo webhooks
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/hooks/:hook").String(),
+			Methods:           ParseHttpMethods([]string{"DELETE"}),
+			SetRequestHeaders: headers,
+		},
+		// Get a group member
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/members/all/:user").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Get a repo member
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/members/all/:user").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// MR info
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// MR versions
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/versions").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Projects
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/:entity_type/:namespace/projects").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// list branches / check existence. Creating a branch (POST) mutates the
+		// repo, so it is gated behind allowCodeAccess below.
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Get branch
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches/:branch").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// post MR comment
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		// post MR comment reply
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// update MR comment
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note").String(),
+			Methods:           ParseHttpMethods([]string{"PUT"}),
+			SetRequestHeaders: headers,
+		},
+		// resolve MR comment
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion").String(),
+			Methods:           ParseHttpMethods([]string{"PUT"}),
+			SetRequestHeaders: headers,
+		},
+		// Get reactions to comments
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Get scm token info
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/personal_access_tokens/self").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+	)
+
+	if scm.allowCodeAccess {
+		allowlist = append(allowlist,
+			// get contents of file
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/files/*").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// create the branch the fix commits onto
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/branches").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// Commits (GET to list; POST to create the commit carrying the fix,
+			// which is how Code Autofix writes a change on GitLab)
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/commits").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			// Compare branches
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/compare").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// get merge base
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/repository/merge_base").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// Update commit status
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/statuses/:commit").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// discover refs ({:namespace/}+ requires one or more non-empty namespace
+			// segments, so GitLab subgroups of any depth match without admitting
+			// double-slash paths). String-concatenated rather than JoinPath'd
+			// because url.URL serialization percent-encodes `{` and `}`, which the
+			// URL Pattern parser would then reject.
+			AllowlistItem{
+				URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/info/refs",
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// download project contents
+			AllowlistItem{
+				URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-upload-pack",
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// push project contents
+			AllowlistItem{
+				URL:               gitLabRootUrl.String() + "/{:namespace/}+:project/git-receive-pack",
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create merge request
+			AllowlistItem{
+				URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
+	return allowlist, nil
+}
+
+func buildBitBucketAllowlist(scm scmInstance) (Allowlist, error) {
+	var allowlist Allowlist
+
+	bitBucketBaseUrl, err := url.Parse(scm.baseURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse bitbucket base URL: %v", err)
+	}
+
+	// the Semgrep AppSec Platform fetches repository contents using the git smart transfer protocol
+	// which requests resources which don't have the typical `/rest/api/latest/scm/` api suffix
+	// see https://git-scm.com/book/be/v2/Git-Internals-Transfer-Protocols
+	bitBucketRootUrl, err := url.Parse(bitBucketBaseUrl.Scheme + "://" + bitBucketBaseUrl.Host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build bitbucket root URL: %v", err)
+	}
+
+	var headers map[string]string
+	if scm.token != "" {
+		headers = map[string]string{
+			"Authorization": fmt.Sprintf("Bearer %v", scm.token),
+		}
+	} else {
+		headers = map[string]string{}
+	}
+
+	allowlist = append(allowlist,
+		// version information and other application properties
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/application-properties").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// project info
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get repos
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// repo info
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// default branch
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/default-branch").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// list branches / check existence with filterText. Creating a branch
+		// (POST) mutates the repo, so it is gated behind allowCodeAccess below.
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// pull requests
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// post PR comment
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// get and update PR comment
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/comments/:comment").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
+			SetRequestHeaders: headers,
+		},
+		// post blockerPR comment
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests/:number/blocker-comments").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		// repository webhooks
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/webhooks/:webhook").String(),
+			Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
+			SetRequestHeaders: headers,
+		},
+		// namespace webhooks
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/webhooks").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               bitBucketBaseUrl.JoinPath("/projects/:project/webhooks/:webhook").String(),
+			Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
+			SetRequestHeaders: headers,
+		},
+	)
+
+	// Deliberately absent: GET /admin/groups, which the platform's list-teams
+	// permission preflight calls. Unlike the equivalent preflights on the other
+	// providers, Bitbucket Data Center exposes groups only under /admin, and the
+	// point of the broker is a narrow tunnel — a capability check does not justify
+	// putting an administrative endpoint in the on-by-default allowlist.
+
+	if scm.allowCodeAccess {
+		allowlist = append(allowlist,
+			// file contents (GET to read; PUT to write the fix, which is how
+			// Bitbucket Data Center's edit-file endpoint commits a change)
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/browse/*").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "PUT"}),
+				SetRequestHeaders: headers,
+			},
+			// update commit build status
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits/:commit/builds").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// discover refs
+			AllowlistItem{
+				URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/info/refs").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// download repo contents
+			AllowlistItem{
+				URL:               bitBucketRootUrl.JoinPath("/scm/:project/:repo/git-upload-pack").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// get commits
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// create the branch the fix commits onto. Also the endpoint the
+			// write-permission preflight POSTs to, so that check now reports
+			// "no write access" on a read-only deployment, which is accurate.
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/branches").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create pull request
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/pull-requests").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
+	return allowlist, nil
+}
+
+func buildAzureDevOpsAllowlist(scm scmInstance) (Allowlist, error) {
+	var allowlist Allowlist
+
+	azureDevOpsBaseUrl, err := url.Parse(scm.baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse azure devops base URL: %v", err)
+	}
+
+	vsaexBaseUrl := strings.Replace(scm.baseURL, "dev.azure.com", "vsaex.dev.azure.com", 1)
+	vsaexUrl, err := url.Parse(vsaexBaseUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse azure devops vsaex base URL: %v", err)
+	}
+
+	var headers map[string]string
+	if scm.token != "" {
+		headers = map[string]string{
+			"Authorization": fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(scm.token))),
+		}
+	} else {
+		headers = map[string]string{}
+	}
+
+	allowlist = append(allowlist,
+		// Check organization access
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/connectionData").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// Namespace info
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/projects/:project").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get repos
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// repo info
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// refs (GET for branch existence check; POST to create a branch)
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/refs").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		// get pull requests
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get pull request iterations
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// get pull request iteration changes
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/iterations/:iterationId/changes").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+		// post and update PR comment
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads").String(),
+			Methods:           ParseHttpMethods([]string{"POST", "PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		// post and update PR comment reply
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments").String(),
+			Methods:           ParseHttpMethods([]string{"POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests/:number/threads/:threadId/comments/:commentId").String(),
+			Methods:           ParseHttpMethods([]string{"PATCH"}),
+			SetRequestHeaders: headers,
+		},
+		// namespace webhooks
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/hooks/subscriptions").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
+			SetRequestHeaders: headers,
+		},
+		// list teams
+		AllowlistItem{
+			URL:               vsaexUrl.JoinPath("/:namespace/_apis/groupentitlements").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
+	)
+
+	if scm.allowCodeAccess {
+		allowlist = append(allowlist,
+			// get file content
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/items").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// update commit status
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/commits/:commit/statuses").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// discover refs
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_git/:repo/info/refs").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// download repo contents
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_git/:repo/git-upload-pack").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// get pull request
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/pullrequests/:number").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// commit the fix. Azure DevOps has no create-commit endpoint: a
+			// commit is written as a push, with refUpdates naming the branch,
+			// which is why no branch appears in the path.
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pushes").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// create pull request. A separate entry rather than adding POST to
+			// the read-only pullRequests entry above, so opening a PR stays
+			// gated as it is on the other three providers.
+			AllowlistItem{
+				URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/git/repositories/:repo/pullRequests").String(),
+				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
+	return allowlist, nil
 }

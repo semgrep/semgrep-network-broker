@@ -435,7 +435,7 @@ func TestAllowlistBitBucketAutofixWrites(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "PUT", repo+"/pull-requests", false)
 
 	// Negative: the permission preflight's admin endpoint is deliberately not
-	// allowlisted. See the note in PopulateAllowLists.
+	// allowlisted. See the note in buildBitBucketAllowlist.
 	assertAllowlistMatch(t, allowlist, "GET", "https://bitbucket.example.com/rest/api/latest/admin/groups", false)
 }
 
