@@ -168,6 +168,7 @@ func writeTestConfig(t *testing.T, privateKeyBase64 string) string {
 }
 
 func TestPrivateKeyEnvironmentVariable(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	t.Setenv(PrivateKeyEnvVar, testPrivateKeyBase64)
 
 	config, err := LoadConfig(nil, 0)
@@ -197,6 +198,22 @@ func TestPrivateKeyEnvironmentVariableOverridesConfigFile(t *testing.T) {
 	}
 }
 
+func TestPrivateKeyEnvironmentVariableOverridesMalformedConfigFileKey(t *testing.T) {
+	// a stale placeholder left in the config file must not block the env key
+	configPath := writeTestConfig(t, "REPLACE-ME-WITH-REAL-KEY")
+	t.Setenv(PrivateKeyEnvVar, testPrivateKeyBase64)
+
+	config, err := LoadConfig([]string{configPath}, 0)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	expected := SensitiveBase64String(mustDecodeBase64(t, testPrivateKeyBase64))
+	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, expected) {
+		t.Errorf("Environment variable should take precedence over malformed config file private key")
+	}
+}
+
 func TestPrivateKeyConfigFileUsedWhenEnvironmentVariableUnset(t *testing.T) {
 	configPath := writeTestConfig(t, testPrivateKeyBase64)
 	t.Setenv(PrivateKeyEnvVar, "")
@@ -213,6 +230,7 @@ func TestPrivateKeyConfigFileUsedWhenEnvironmentVariableUnset(t *testing.T) {
 }
 
 func TestPrivateKeyEnvironmentVariableInvalidBase64(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	t.Setenv(PrivateKeyEnvVar, "not base64!")
 
 	_, err := LoadConfig(nil, 0)
@@ -234,6 +252,7 @@ func writeTestPrivateKeyFile(t *testing.T, contents string) string {
 }
 
 func TestPrivateKeyPathEnvironmentVariable(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	// genkey output and mounted secrets usually end in a newline
 	path := writeTestPrivateKeyFile(t, testPrivateKeyBase64+"\n")
 	t.Setenv(PrivateKeyEnvVar, "")
@@ -251,6 +270,7 @@ func TestPrivateKeyPathEnvironmentVariable(t *testing.T) {
 }
 
 func TestPrivateKeyEnvironmentVariableTakesPrecedenceOverPath(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	path := writeTestPrivateKeyFile(t, base64.StdEncoding.EncodeToString(make([]byte, WireguardPrivateKeySize)))
 	t.Setenv(PrivateKeyEnvVar, testPrivateKeyBase64)
 	t.Setenv(PrivateKeyPathEnvVar, path)
@@ -267,6 +287,7 @@ func TestPrivateKeyEnvironmentVariableTakesPrecedenceOverPath(t *testing.T) {
 }
 
 func TestPrivateKeyPathMissingFile(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	t.Setenv(PrivateKeyEnvVar, "")
 	t.Setenv(PrivateKeyPathEnvVar, filepath.Join(t.TempDir(), "does-not-exist"))
 
@@ -280,6 +301,7 @@ func TestPrivateKeyPathMissingFile(t *testing.T) {
 }
 
 func TestPrivateKeyPathEmptyFile(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	path := writeTestPrivateKeyFile(t, "\n")
 	t.Setenv(PrivateKeyEnvVar, "")
 	t.Setenv(PrivateKeyPathEnvVar, path)
@@ -294,6 +316,7 @@ func TestPrivateKeyPathEmptyFile(t *testing.T) {
 }
 
 func TestPrivateKeyWrongLengthFromPath(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	path := writeTestPrivateKeyFile(t, base64.StdEncoding.EncodeToString(make([]byte, 16)))
 	t.Setenv(PrivateKeyEnvVar, "")
 	t.Setenv(PrivateKeyPathEnvVar, path)
@@ -309,6 +332,7 @@ func TestPrivateKeyWrongLengthFromPath(t *testing.T) {
 }
 
 func TestPrivateKeyWrongLengthFromEnvironmentVariable(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	t.Setenv(PrivateKeyEnvVar, base64.StdEncoding.EncodeToString(make([]byte, 16)))
 
 	_, err := LoadConfig(nil, 0)
@@ -336,6 +360,7 @@ func TestPrivateKeyWrongLengthFromConfigFile(t *testing.T) {
 }
 
 func TestPrivateKeyLegacyConcatenatedKeysAccepted(t *testing.T) {
+	t.Cleanup(viper.Reset)
 	// legacy concatenated keys (see GenerateConfig) must still load
 	t.Setenv(PrivateKeyEnvVar, base64.StdEncoding.EncodeToString(make([]byte, 2*WireguardPrivateKeySize)))
 

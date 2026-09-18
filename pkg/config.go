@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -26,6 +25,7 @@ const DefaultSemgrepHostname = "semgrep.dev"
 const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
 const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
 const PrivateKeyPathEnvVar = PrivateKeyEnvVar + "_PATH"
+const privateKeyConfigKey = "inbound.wireguard.privateKey"
 
 const WireguardPrivateKeySize = 32 // bytes; 44 characters in base64
 
@@ -403,39 +403,40 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	}
 
 	// Step 3: Load config files passed via command line
-	privateKeyBeforeConfigFiles := config.Inbound.Wireguard.PrivateKey
 	for i := range configFiles {
 		viper.SetConfigFile(configFiles[i])
 		if err := viper.MergeInConfig(); err != nil {
 			return nil, fmt.Errorf("failed to merge config file '%s': %v", configFiles[i], err)
 		}
 	}
-	if err := viper.Unmarshal(config, viper.DecodeHook(
-		mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook))); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
-	}
-	if !bytes.Equal(privateKeyBeforeConfigFiles, config.Inbound.Wireguard.PrivateKey) {
-		privateKeySource = "config file"
-	}
 
-	// Step 4: Apply private key from the environment if provided (takes precedence over all other sources)
+	// Step 4: Apply private key from the environment if provided (takes precedence over all other sources).
+	// Set on viper before unmarshalling so a stale or malformed config file key is never decoded.
 	privateKeyEnv, privateKeyEnvSource, err := loadPrivateKeyFromEnv()
 	if err != nil {
 		return nil, err
 	}
 	if privateKeyEnv != "" {
-		if len(config.Inbound.Wireguard.PrivateKey) > 0 {
+		if viper.IsSet(privateKeyConfigKey) {
+			log.WithField("source", "environment_variable").Warnf("%s overriding private key from config file", privateKeyEnvSource)
+		} else if len(config.Inbound.Wireguard.PrivateKey) > 0 {
 			log.WithField("source", "environment_variable").Warnf("%s overriding private key from %s", privateKeyEnvSource, privateKeySource)
 		}
 
-		privateKeyBytes, err := base64.StdEncoding.DecodeString(privateKeyEnv)
-		if err != nil {
+		if _, err := base64.StdEncoding.DecodeString(privateKeyEnv); err != nil {
 			return nil, fmt.Errorf("failed to decode private key from %s: %v", privateKeyEnvSource, err)
 		}
 
-		config.Inbound.Wireguard.PrivateKey = SensitiveBase64String(privateKeyBytes)
+		viper.Set(privateKeyConfigKey, privateKeyEnv)
 		privateKeySource = privateKeyEnvSource
 		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s", privateKeyEnvSource)
+	} else if viper.IsSet(privateKeyConfigKey) {
+		privateKeySource = "config file"
+	}
+
+	if err := viper.Unmarshal(config, viper.DecodeHook(
+		mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook))); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
 	// Validate the key length regardless of source; otherwise a bad key only surfaces as a panic in GenerateConfig
