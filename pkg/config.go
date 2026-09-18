@@ -26,6 +26,7 @@ const SemgrepHostnameEnvVar = "SEMGREP_HOSTNAME"
 const DefaultSemgrepHostname = "semgrep.dev"
 const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
 const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
+const PrivateKeyPathEnvVar = PrivateKeyEnvVar + "_PATH"
 
 // WireguardPrivateKeySize is the length of a WireGuard (Curve25519) private key in bytes.
 const WireguardPrivateKeySize = device.NoisePrivateKeySize
@@ -43,6 +44,33 @@ func validateWireguardPrivateKey(key SensitiveBase64String, source string) error
 		"invalid WireGuard private key from %s: expected %d bytes (%d base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'",
 		source, WireguardPrivateKeySize, base64.StdEncoding.EncodedLen(WireguardPrivateKeySize), len(key),
 	)
+}
+
+// loadPrivateKeyFromEnv returns the base64 private key supplied via the environment, if any,
+// along with a human readable description of where it came from. The plain variable takes
+// precedence over the _PATH variable. Surrounding whitespace is trimmed so that keys read from
+// files with a trailing newline are accepted.
+func loadPrivateKeyFromEnv() (string, string, error) {
+	if value := strings.TrimSpace(os.Getenv(PrivateKeyEnvVar)); value != "" {
+		return value, PrivateKeyEnvVar + " environment variable", nil
+	}
+
+	path := os.Getenv(PrivateKeyPathEnvVar)
+	if path == "" {
+		return "", "", nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read private key file %q named by %s: %w", path, PrivateKeyPathEnvVar, err)
+	}
+
+	value := strings.TrimSpace(string(data))
+	if value == "" {
+		return "", "", fmt.Errorf("private key file %q named by %s is empty", path, PrivateKeyPathEnvVar)
+	}
+
+	return value, fmt.Sprintf("file %q (%s)", path, PrivateKeyPathEnvVar), nil
 }
 
 func getSemgrepHostname() string {
@@ -401,20 +429,26 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		privateKeySource = "config file"
 	}
 
-	// Step 4: Apply private key from environment variable if provided (takes precedence over all other sources)
-	if privateKeyEnv := os.Getenv(PrivateKeyEnvVar); privateKeyEnv != "" {
+	// Step 4: Apply private key from the environment if provided, either directly via
+	// SEMGREP_NETWORK_BROKER_PRIVATE_KEY or from a file named by SEMGREP_NETWORK_BROKER_PRIVATE_KEY_PATH.
+	// This takes precedence over all other sources.
+	privateKeyEnv, privateKeyEnvSource, err := loadPrivateKeyFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if privateKeyEnv != "" {
 		if len(config.Inbound.Wireguard.PrivateKey) > 0 {
-			log.WithField("source", "environment_variable").Warnf("%s environment variable overriding private key from %s", PrivateKeyEnvVar, privateKeySource)
+			log.WithField("source", "environment_variable").Warnf("%s overriding private key from %s", privateKeyEnvSource, privateKeySource)
 		}
 
 		privateKeyBytes, err := base64.StdEncoding.DecodeString(privateKeyEnv)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode %s: %v", PrivateKeyEnvVar, err)
+			return nil, fmt.Errorf("failed to decode private key from %s: %v", privateKeyEnvSource, err)
 		}
 
 		config.Inbound.Wireguard.PrivateKey = SensitiveBase64String(privateKeyBytes)
-		privateKeySource = PrivateKeyEnvVar + " environment variable"
-		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s environment variable", PrivateKeyEnvVar)
+		privateKeySource = privateKeyEnvSource
+		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s", privateKeyEnvSource)
 	}
 
 	// Validate the private key length regardless of which source supplied it. A wrong-length key

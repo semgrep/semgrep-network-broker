@@ -72,12 +72,12 @@ spec:
 #
 #   kubectl create secret generic broker-secret --from-file=broker-secret.yaml
 #
-# Alternatively, supply the private key via the SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment
-# variable instead of a config file. Create a secret holding just the base64 key:
+# Alternatively, supply the private key via the environment instead of a config file.
+# Create a secret holding just the base64 key:
 #
 #   kubectl create secret generic broker-private-key --from-literal=privateKey=WIREGUARD-PRIVATE-KEY-HERE
 #
-# and reference it from the container spec:
+# then either inject it as an environment variable:
 #
 #   env:
 #     - name: SEMGREP_NETWORK_BROKER_PRIVATE_KEY
@@ -86,5 +86,19 @@ spec:
 #           name: broker-private-key
 #           key: privateKey
 #
-# When set, the environment variable takes precedence over a private key in any config file.
+# or mount the secret as a file and point the broker at it:
+#
+#   env:
+#     - name: SEMGREP_NETWORK_BROKER_PRIVATE_KEY_PATH
+#       value: /secret/privateKey
+#   volumeMounts:
+#     - mountPath: /secret
+#       name: broker-private-key-volume
+#       readOnly: true
+#   volumes:
+#     - name: broker-private-key-volume
+#       secret:
+#         secretName: broker-private-key
+#
+# A key from the environment takes precedence over a private key in any config file.
 # ---
