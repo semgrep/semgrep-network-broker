@@ -27,12 +27,10 @@ const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
 const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
 const PrivateKeyPathEnvVar = PrivateKeyEnvVar + "_PATH"
 
-// WireguardPrivateKeySize is the length of a WireGuard private key in bytes (44 characters in base64).
-const WireguardPrivateKeySize = 32
+const WireguardPrivateKeySize = 32 // bytes; 44 characters in base64
 
-// validateWireguardPrivateKey rejects keys that are not a whole number of WireGuard keys.
-// Legacy concatenated multi-key values (see GenerateConfig) are therefore still accepted.
-// An empty key is left to struct validation when the tunnel starts.
+// Accepts any whole multiple of the key size so legacy concatenated keys (see GenerateConfig) still load.
+// An empty key is caught by struct validation at tunnel start.
 func validateWireguardPrivateKey(key SensitiveBase64String, source string) error {
 	if len(key)%WireguardPrivateKeySize != 0 {
 		return fmt.Errorf("invalid WireGuard private key from %s: expected 32 bytes (44 base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'", source, len(key))
@@ -40,10 +38,8 @@ func validateWireguardPrivateKey(key SensitiveBase64String, source string) error
 	return nil
 }
 
-// loadPrivateKeyFromEnv returns the base64 private key supplied via the environment, if any,
-// along with a human readable description of where it came from. The plain variable takes
-// precedence over the _PATH variable. Surrounding whitespace is trimmed so that keys read from
-// files with a trailing newline are accepted.
+// Returns the base64 private key from the environment (if any) and a description of its source.
+// The plain variable wins over _PATH. Whitespace is trimmed so files with a trailing newline work.
 func loadPrivateKeyFromEnv() (string, string, error) {
 	if value := strings.TrimSpace(os.Getenv(PrivateKeyEnvVar)); value != "" {
 		return value, PrivateKeyEnvVar + " environment variable", nil
@@ -350,8 +346,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		},
 	}
 
-	// Where the private key ultimately came from, for error messages
-	privateKeySource := "config"
+	privateKeySource := "config" // for error messages
 
 	// Step 1: Apply config values encoded in broker token (if provided)
 	tokenString, err := LoadTokenFromEnv()
@@ -423,9 +418,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		privateKeySource = "config file"
 	}
 
-	// Step 4: Apply private key from the environment if provided, either directly via
-	// SEMGREP_NETWORK_BROKER_PRIVATE_KEY or from a file named by SEMGREP_NETWORK_BROKER_PRIVATE_KEY_PATH.
-	// This takes precedence over all other sources.
+	// Step 4: Apply private key from the environment if provided (takes precedence over all other sources)
 	privateKeyEnv, privateKeyEnvSource, err := loadPrivateKeyFromEnv()
 	if err != nil {
 		return nil, err
@@ -445,8 +438,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s", privateKeyEnvSource)
 	}
 
-	// Validate the private key length regardless of which source supplied it. A wrong-length key
-	// would otherwise only surface as a panic when the WireGuard tunnel config is generated.
+	// Validate the key length regardless of source; otherwise a bad key only surfaces as a panic in GenerateConfig
 	if err := validateWireguardPrivateKey(config.Inbound.Wireguard.PrivateKey, privateKeySource); err != nil {
 		return nil, err
 	}

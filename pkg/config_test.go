@@ -151,8 +151,7 @@ func mustDecodeBase64(t *testing.T, s string) []byte {
 	return b
 }
 
-// writeTestConfig writes a config file containing the given private key to a temp dir.
-// viper keeps merged config files in global state, so it is reset when the test finishes.
+// viper holds merged config files in global state, so it is reset on cleanup.
 func writeTestConfig(t *testing.T, privateKeyBase64 string) string {
 	t.Helper()
 	t.Cleanup(viper.Reset)
@@ -225,7 +224,6 @@ func TestPrivateKeyEnvironmentVariableInvalidBase64(t *testing.T) {
 	}
 }
 
-// writeTestPrivateKeyFile writes a raw base64 private key to a temp file, as a mounted secret would.
 func writeTestPrivateKeyFile(t *testing.T, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "privateKey")
@@ -236,7 +234,7 @@ func writeTestPrivateKeyFile(t *testing.T, contents string) string {
 }
 
 func TestPrivateKeyPathEnvironmentVariable(t *testing.T) {
-	// Files produced by genkey or secret mounts commonly end in a newline; it must be tolerated.
+	// genkey output and mounted secrets usually end in a newline
 	path := writeTestPrivateKeyFile(t, testPrivateKeyBase64+"\n")
 	t.Setenv(PrivateKeyEnvVar, "")
 	t.Setenv(PrivateKeyPathEnvVar, path)
@@ -338,8 +336,7 @@ func TestPrivateKeyWrongLengthFromConfigFile(t *testing.T) {
 }
 
 func TestPrivateKeyLegacyConcatenatedKeysAccepted(t *testing.T) {
-	// Older brokers could be configured with several 32 byte keys concatenated together.
-	// These must keep loading; GenerateConfig uses the first key.
+	// legacy concatenated keys (see GenerateConfig) must still load
 	t.Setenv(PrivateKeyEnvVar, base64.StdEncoding.EncodeToString(make([]byte, 2*WireguardPrivateKeySize)))
 
 	config, err := LoadConfig(nil, 0)
