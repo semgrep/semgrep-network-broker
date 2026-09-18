@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -293,6 +294,7 @@ type InboundProxyConfig struct {
 	ProxyListenPort int              `mapstructure:"proxyListenPort" json:"proxyListenPort" validate:"gte=0" default:"80"`
 	Logging         LoggingConfig    `mapstructure:"logging" json:"logging"`
 	Heartbeat       HeartbeatConfig  `mapstructure:"heartbeat" json:"heartbeat"`
+	SCMs            []SCM            `mapstructure:"scms" json:"scms"`
 	GitHub          *GitHub          `mapstructure:"github" json:"github"`
 	GitLab          *GitLab          `mapstructure:"gitlab" json:"gitlab"`
 	BitBucket       *BitBucket       `mapstructure:"bitbucket" json:"bitbucket"`
@@ -338,6 +340,8 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	hostname := getSemgrepHostname()
 
 	config := new(Config)
+
+	var scms []map[string]any
 
 	// Step 0: Set default wireguard peer
 	config.Inbound.Wireguard.Peers = []WireguardPeer{
@@ -396,17 +400,15 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		io.Copy(f, resp.Body)
 		defer resp.Body.Close()
 
-		viper.SetConfigFile(f.Name())
-		if err := viper.MergeInConfig(); err != nil {
-			return nil, fmt.Errorf("failed to merge config file '%s': %v", f.Name(), err)
+		if err := mergeConfigFile(f.Name(), &scms); err != nil {
+			return nil, err
 		}
 	}
 
 	// Step 3: Load config files passed via command line
 	for i := range configFiles {
-		viper.SetConfigFile(configFiles[i])
-		if err := viper.MergeInConfig(); err != nil {
-			return nil, fmt.Errorf("failed to merge config file '%s': %v", configFiles[i], err)
+		if err := mergeConfigFile(configFiles[i], &scms); err != nil {
+			return nil, err
 		}
 	}
 
@@ -441,6 +443,15 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 
 	// Validate the key length regardless of source; otherwise a bad key only surfaces as a panic in GenerateConfig
 	if err := validateWireguardPrivateKey(config.Inbound.Wireguard.PrivateKey, privateKeySource); err != nil {
+		return nil, err
+	}
+
+	config.Inbound.SCMs = nil
+	if err := decodeSCMs(scms, &config.Inbound.SCMs); err != nil {
+		return nil, fmt.Errorf("failed to decode %s: %v", scmsConfigKey, err)
+	}
+
+	if err := validateSCMs(&config.Inbound); err != nil {
 		return nil, err
 	}
 
@@ -510,17 +521,174 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	return config, nil
 }
 
-type scmType string
+const scmsConfigKey = "inbound.scms"
+
+// mergeConfigFile merges path into the shared viper config, first setting aside
+// inbound.scms. viper replaces slices on merge instead of combining them, so a list
+// declared in two files would keep only the last file's entries.
+func mergeConfigFile(path string, scms *[]map[string]any) error {
+	v := viper.New()
+	v.SetConfigFile(path)
+	if err := v.ReadInConfig(); err != nil {
+		return fmt.Errorf("failed to read config file '%s': %v", path, err)
+	}
+
+	if value := v.Get(scmsConfigKey); value != nil {
+		raw, ok := value.([]any)
+		if !ok {
+			return fmt.Errorf("%s: %s must be a list", path, scmsConfigKey)
+		}
+
+		for i, item := range raw {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				return fmt.Errorf("%s: %s[%d] is not a mapping", path, scmsConfigKey, i)
+			}
+			mergeSCMEntry(scms, entry)
+		}
+	}
+
+	viper.SetConfigFile(path)
+	if err := viper.MergeInConfig(); err != nil {
+		return fmt.Errorf("failed to merge config file '%s': %v", path, err)
+	}
+
+	return nil
+}
+
+// An SCM is identified by its type and base URL, both of which a config states anyway, so
+// one file can amend another's entry without anyone naming it. Scheme and host are
+// compared case-insensitively per RFC 3986; the path is case-sensitive and is left alone.
+// Map keys are lowercase because viper has already flattened their case.
+func scmKey(scmType, baseURL string) string {
+	if parsed, err := url.Parse(baseURL); err == nil && parsed.Host != "" {
+		parsed.Scheme = strings.ToLower(parsed.Scheme)
+		parsed.Host = strings.ToLower(parsed.Host)
+		baseURL = parsed.String()
+	}
+
+	return strings.ToLower(scmType) + " " + baseURL
+}
+
+func scmEntryKey(entry map[string]any) string {
+	scmType, _ := entry["type"].(string)
+	baseURL, _ := entry["baseurl"].(string)
+
+	return scmKey(scmType, baseURL)
+}
+
+// Entries stay maps until every file is read: a decoded struct cannot tell
+// allowCodeAccess:false from an absent key, so merging structs would leave no way to
+// clear the flag in a later file.
+func mergeSCMEntry(scms *[]map[string]any, incoming map[string]any) {
+	key := scmEntryKey(incoming)
+	for _, existing := range *scms {
+		if scmEntryKey(existing) == key {
+			maps.Copy(existing, incoming)
+			return
+		}
+	}
+
+	*scms = append(*scms, incoming)
+}
+
+// ErrorUnused rejects keys the SCM struct does not define. Without it a misspelled
+// allowCodeAccess merges in as a stray key and silently leaves the real flag as an
+// earlier file set it, which is the fail-open case the map-based merge exists to avoid.
+func decodeSCMs(raw []map[string]any, out *[]SCM) error {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:      out,
+		ErrorUnused: true,
+		DecodeHook:  mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook),
+	})
+	if err != nil {
+		return err
+	}
+
+	return decoder.Decode(raw)
+}
+
+// baseUrl is required because it is half the identity of an entry: entries without one
+// would all collapse onto each other.
+//
+// A single-provider key naming the same SCM as a list entry is rejected rather than
+// resolved. The two would otherwise generate separate allowlists and the more permissive
+// allowCodeAccess would win, so a config saying false in one place and true in the other
+// grants code access.
+func validateSCMs(config *InboundProxyConfig) error {
+	keys := make(map[string]struct{}, len(config.SCMs))
+
+	for i, scm := range config.SCMs {
+		switch scm.Type {
+		case SCMTypeGitHub, SCMTypeGitLab, SCMTypeBitBucket, SCMTypeAzureDevOps:
+		default:
+			return fmt.Errorf("%s[%d]: unknown type %q", scmsConfigKey, i, scm.Type)
+		}
+
+		if scm.BaseURL == "" {
+			return fmt.Errorf("%s[%d]: baseUrl is required", scmsConfigKey, i)
+		}
+
+		keys[scmKey(string(scm.Type), scm.BaseURL)] = struct{}{}
+	}
+
+	checkOverlap := func(field string, scmType SCMType, baseURL string) error {
+		if _, ok := keys[scmKey(string(scmType), baseURL)]; !ok {
+			return nil
+		}
+
+		return fmt.Errorf("inbound.%s and %s both configure %v %v: declare it in one place",
+			field, scmsConfigKey, scmType, baseURL)
+	}
+
+	if config.GitHub != nil {
+		if err := checkOverlap("github", SCMTypeGitHub, config.GitHub.BaseURL); err != nil {
+			return err
+		}
+	}
+	if config.GitLab != nil {
+		if err := checkOverlap("gitlab", SCMTypeGitLab, config.GitLab.BaseURL); err != nil {
+			return err
+		}
+	}
+	if config.BitBucket != nil {
+		if err := checkOverlap("bitbucket", SCMTypeBitBucket, config.BitBucket.BaseURL); err != nil {
+			return err
+		}
+	}
+	if config.AzureDevOps != nil {
+		if err := checkOverlap("azuredevops", SCMTypeAzureDevOps, config.AzureDevOps.BaseURL); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type SCMType string
 
 const (
-	scmGitHub      scmType = "github"
-	scmGitLab      scmType = "gitlab"
-	scmBitBucket   scmType = "bitbucket"
-	scmAzureDevOps scmType = "azuredevops"
+	SCMTypeGitHub      SCMType = "github"
+	SCMTypeGitLab      SCMType = "gitlab"
+	SCMTypeBitBucket   SCMType = "bitbucket"
+	SCMTypeAzureDevOps SCMType = "azuredevops"
 )
 
+// SCM is one entry of inbound.scms. Several entries may share a Type, which is what the
+// single-provider keys cannot express.
+type SCM struct {
+	Type            SCMType `mapstructure:"type" json:"type"`
+	BaseURL         string  `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           string  `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool    `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+}
+
 type scmInstance struct {
-	typ             scmType
+	typ             SCMType
 	baseURL         string
 	token           string
 	allowCodeAccess bool
@@ -532,9 +700,18 @@ type scmInstance struct {
 func (config *InboundProxyConfig) scmInstances() []scmInstance {
 	var instances []scmInstance
 
+	for _, scm := range config.SCMs {
+		instances = append(instances, scmInstance{
+			typ:             scm.Type,
+			baseURL:         scm.BaseURL,
+			token:           scm.Token,
+			allowCodeAccess: scm.AllowCodeAccess,
+		})
+	}
+
 	if config.GitHub != nil {
 		instances = append(instances, scmInstance{
-			typ:             scmGitHub,
+			typ:             SCMTypeGitHub,
 			baseURL:         config.GitHub.BaseURL,
 			token:           config.GitHub.Token,
 			allowCodeAccess: config.GitHub.AllowCodeAccess,
@@ -543,7 +720,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 
 	if config.GitLab != nil {
 		instances = append(instances, scmInstance{
-			typ:             scmGitLab,
+			typ:             SCMTypeGitLab,
 			baseURL:         config.GitLab.BaseURL,
 			token:           config.GitLab.Token,
 			allowCodeAccess: config.GitLab.AllowCodeAccess,
@@ -552,7 +729,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 
 	if config.BitBucket != nil {
 		instances = append(instances, scmInstance{
-			typ:             scmBitBucket,
+			typ:             SCMTypeBitBucket,
 			baseURL:         config.BitBucket.BaseURL,
 			token:           config.BitBucket.Token,
 			allowCodeAccess: config.BitBucket.AllowCodeAccess,
@@ -561,7 +738,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 
 	if config.AzureDevOps != nil {
 		instances = append(instances, scmInstance{
-			typ:             scmAzureDevOps,
+			typ:             SCMTypeAzureDevOps,
 			baseURL:         config.AzureDevOps.BaseURL,
 			token:           config.AzureDevOps.Token,
 			allowCodeAccess: config.AzureDevOps.AllowCodeAccess,
@@ -579,13 +756,13 @@ func PopulateAllowLists(config *Config) error {
 		)
 
 		switch scm.typ {
-		case scmGitHub:
+		case SCMTypeGitHub:
 			allowlist, err = buildGitHubAllowlist(scm)
-		case scmGitLab:
+		case SCMTypeGitLab:
 			allowlist, err = buildGitLabAllowlist(scm)
-		case scmBitBucket:
+		case SCMTypeBitBucket:
 			allowlist, err = buildBitBucketAllowlist(scm)
-		case scmAzureDevOps:
+		case SCMTypeAzureDevOps:
 			allowlist, err = buildAzureDevOpsAllowlist(scm)
 		default:
 			return fmt.Errorf("unknown scm type %q", scm.typ)
