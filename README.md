@@ -61,6 +61,19 @@ inbound:
   allowlist: [...]
 ```
 
+#### Private key via environment variable
+
+Instead of writing the private key into a config file, you can supply it through the `SEMGREP_NETWORK_BROKER_PRIVATE_KEY` environment variable. This is useful when your deployment platform injects secrets as environment variables.
+
+```bash
+export SEMGREP_NETWORK_BROKER_PRIVATE_KEY="$(semgrep-network-broker genkey)"
+semgrep-network-broker -c config.yaml
+```
+
+- The value is the same base64 string you would put in `inbound.wireguard.privateKey`.
+- When set, it takes precedence over a private key from any other source (broker token or config file), and the broker logs a warning that it is overriding that key.
+- The private key must decode to exactly 32 bytes (44 base64 characters). The broker refuses to start with a clear error if a key of the wrong length is supplied, whichever source it came from.
+
 ### HttpClient
 
 The `httpClient` configuration section modifies the HTTP client used for proxying requests.

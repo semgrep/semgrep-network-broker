@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -18,11 +19,31 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+	"golang.zx2c4.com/wireguard/device"
 )
 
 const SemgrepHostnameEnvVar = "SEMGREP_HOSTNAME"
 const DefaultSemgrepHostname = "semgrep.dev"
 const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
+const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
+
+// WireguardPrivateKeySize is the length of a WireGuard (Curve25519) private key in bytes.
+const WireguardPrivateKeySize = device.NoisePrivateKeySize
+
+// validateWireguardPrivateKey checks that a private key is a whole number of WireGuard keys.
+// Exactly one key (32 bytes, 44 base64 characters) is the normal case. Older brokers could be
+// configured with several keys concatenated together (see GenerateConfig), so any positive
+// multiple of the key size is still accepted. An empty key is not an error here: it is caught
+// by struct validation when the WireGuard tunnel is started.
+func validateWireguardPrivateKey(key SensitiveBase64String, source string) error {
+	if len(key) == 0 || len(key)%WireguardPrivateKeySize == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"invalid WireGuard private key from %s: expected %d bytes (%d base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'",
+		source, WireguardPrivateKeySize, base64.StdEncoding.EncodedLen(WireguardPrivateKeySize), len(key),
+	)
+}
 
 func getSemgrepHostname() string {
 	hostname := os.Getenv(SemgrepHostnameEnvVar)
@@ -307,6 +328,9 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		},
 	}
 
+	// Where the private key ultimately came from, for error messages
+	privateKeySource := "config"
+
 	// Step 1: Apply config values encoded in broker token (if provided)
 	tokenString, err := LoadTokenFromEnv()
 	if err != nil {
@@ -321,6 +345,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 
 		config.Inbound.Wireguard.LocalAddress = token.WireguardCredential.LocalAddress
 		config.Inbound.Wireguard.PrivateKey = token.WireguardCredential.PrivateKey
+		privateKeySource = "broker token"
 		log.WithField("source", "broker_token").Info("Loaded WireGuard private key from broker token")
 	}
 
@@ -361,6 +386,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 	}
 
 	// Step 3: Load config files passed via command line
+	privateKeyBeforeConfigFiles := config.Inbound.Wireguard.PrivateKey
 	for i := range configFiles {
 		viper.SetConfigFile(configFiles[i])
 		if err := viper.MergeInConfig(); err != nil {
@@ -371,20 +397,30 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook))); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
+	if !bytes.Equal(privateKeyBeforeConfigFiles, config.Inbound.Wireguard.PrivateKey) {
+		privateKeySource = "config file"
+	}
 
 	// Step 4: Apply private key from environment variable if provided (takes precedence over all other sources)
-	if privateKeyEnv := os.Getenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY"); privateKeyEnv != "" {
+	if privateKeyEnv := os.Getenv(PrivateKeyEnvVar); privateKeyEnv != "" {
 		if len(config.Inbound.Wireguard.PrivateKey) > 0 {
-			log.WithField("source", "environment_variable").Warn("SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable overriding previously configured private key")
+			log.WithField("source", "environment_variable").Warnf("%s environment variable overriding private key from %s", PrivateKeyEnvVar, privateKeySource)
 		}
 
 		privateKeyBytes, err := base64.StdEncoding.DecodeString(privateKeyEnv)
 		if err != nil {
-			return nil, fmt.Errorf("failed to decode SEMGREP_NETWORK_BROKER_PRIVATE_KEY: %v", err)
+			return nil, fmt.Errorf("failed to decode %s: %v", PrivateKeyEnvVar, err)
 		}
 
 		config.Inbound.Wireguard.PrivateKey = SensitiveBase64String(privateKeyBytes)
-		log.WithField("source", "environment_variable").Info("Loaded WireGuard private key from SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable")
+		privateKeySource = PrivateKeyEnvVar + " environment variable"
+		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s environment variable", PrivateKeyEnvVar)
+	}
+
+	// Validate the private key length regardless of which source supplied it. A wrong-length key
+	// would otherwise only surface as a panic when the WireGuard tunnel config is generated.
+	if err := validateWireguardPrivateKey(config.Inbound.Wireguard.PrivateKey, privateKeySource); err != nil {
+		return nil, err
 	}
 
 	// Step 5: Resolve TXT record(s) of wireguard peers, fill in config values if not set in a config file

@@ -4,10 +4,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/viper"
 	"gopkg.in/dealancer/validate.v2"
 )
 
@@ -137,27 +140,128 @@ func TestHttpMethodsDecodeHook(t *testing.T) {
 	}
 }
 
+const testPrivateKeyBase64 = "KJR4EeL83nexOFihmdYciri7Mo7ciAq/b5/S0lREcns="
+
+func mustDecodeBase64(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		t.Fatalf("failed to decode test value: %v", err)
+	}
+	return b
+}
+
+// writeTestConfig writes a config file containing the given private key to a temp dir.
+// viper keeps merged config files in global state, so it is reset when the test finishes.
+func writeTestConfig(t *testing.T, privateKeyBase64 string) string {
+	t.Helper()
+	t.Cleanup(viper.Reset)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	contents := fmt.Sprintf(`inbound:
+  wireguard:
+    privateKey: %s
+    disablePeerSettingsDnsLookup: true
+`, privateKeyBase64)
+	if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+		t.Fatalf("failed to write test config: %v", err)
+	}
+	return path
+}
+
 func TestPrivateKeyEnvironmentVariable(t *testing.T) {
-	// Test that SEMGREP_NETWORK_BROKER_PRIVATE_KEY environment variable is properly loaded
-	testPrivateKey := "KJR4EeL83nexOFihmdYciri7Mo7ciAq/b5/S0lREcns="
+	t.Setenv(PrivateKeyEnvVar, testPrivateKeyBase64)
 
-	// Set the environment variable
-	os.Setenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY", testPrivateKey)
-	defer os.Unsetenv("SEMGREP_NETWORK_BROKER_PRIVATE_KEY")
-
-	// Load config
 	config, err := LoadConfig(nil, 0)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Verify the private key was loaded correctly
-	expectedBytes, err := base64.StdEncoding.DecodeString(testPrivateKey)
+	expected := SensitiveBase64String(mustDecodeBase64(t, testPrivateKeyBase64))
+	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, expected) {
+		t.Errorf("Private key not loaded correctly from environment variable")
+	}
+}
+
+func TestPrivateKeyEnvironmentVariableOverridesConfigFile(t *testing.T) {
+	configFileKey := base64.StdEncoding.EncodeToString(make([]byte, WireguardPrivateKeySize))
+	configPath := writeTestConfig(t, configFileKey)
+	t.Setenv(PrivateKeyEnvVar, testPrivateKeyBase64)
+
+	config, err := LoadConfig([]string{configPath}, 0)
 	if err != nil {
-		t.Fatalf("Failed to decode test private key: %v", err)
+		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, SensitiveBase64String(expectedBytes)) {
-		t.Errorf("Private key not loaded correctly from environment variable")
+	expected := SensitiveBase64String(mustDecodeBase64(t, testPrivateKeyBase64))
+	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, expected) {
+		t.Errorf("Environment variable should take precedence over config file private key")
+	}
+}
+
+func TestPrivateKeyConfigFileUsedWhenEnvironmentVariableUnset(t *testing.T) {
+	configPath := writeTestConfig(t, testPrivateKeyBase64)
+	t.Setenv(PrivateKeyEnvVar, "")
+
+	config, err := LoadConfig([]string{configPath}, 0)
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	expected := SensitiveBase64String(mustDecodeBase64(t, testPrivateKeyBase64))
+	if !reflect.DeepEqual(config.Inbound.Wireguard.PrivateKey, expected) {
+		t.Errorf("Private key not loaded correctly from config file")
+	}
+}
+
+func TestPrivateKeyEnvironmentVariableInvalidBase64(t *testing.T) {
+	t.Setenv(PrivateKeyEnvVar, "not base64!")
+
+	_, err := LoadConfig(nil, 0)
+	if err == nil {
+		t.Fatal("expected an error for invalid base64 private key")
+	}
+	if !strings.Contains(err.Error(), "failed to decode "+PrivateKeyEnvVar) {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestPrivateKeyWrongLengthFromEnvironmentVariable(t *testing.T) {
+	t.Setenv(PrivateKeyEnvVar, base64.StdEncoding.EncodeToString(make([]byte, 16)))
+
+	_, err := LoadConfig(nil, 0)
+	if err == nil {
+		t.Fatal("expected an error for a 16 byte private key")
+	}
+	want := "invalid WireGuard private key from " + PrivateKeyEnvVar + " environment variable: expected 32 bytes (44 base64 characters), got 16 bytes"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("unexpected error:\n got: %v\nwant: %v", err, want)
+	}
+}
+
+func TestPrivateKeyWrongLengthFromConfigFile(t *testing.T) {
+	configPath := writeTestConfig(t, base64.StdEncoding.EncodeToString(make([]byte, 31)))
+	t.Setenv(PrivateKeyEnvVar, "")
+
+	_, err := LoadConfig([]string{configPath}, 0)
+	if err == nil {
+		t.Fatal("expected an error for a 31 byte private key")
+	}
+	want := "invalid WireGuard private key from config file: expected 32 bytes (44 base64 characters), got 31 bytes"
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("unexpected error:\n got: %v\nwant: %v", err, want)
+	}
+}
+
+func TestPrivateKeyLegacyConcatenatedKeysAccepted(t *testing.T) {
+	// Older brokers could be configured with several 32 byte keys concatenated together.
+	// These must keep loading; GenerateConfig uses the first key.
+	t.Setenv(PrivateKeyEnvVar, base64.StdEncoding.EncodeToString(make([]byte, 2*WireguardPrivateKeySize)))
+
+	config, err := LoadConfig(nil, 0)
+	if err != nil {
+		t.Fatalf("legacy concatenated key should load: %v", err)
+	}
+	if len(config.Inbound.Wireguard.PrivateKey) != 2*WireguardPrivateKeySize {
+		t.Errorf("expected %d byte key, got %d", 2*WireguardPrivateKeySize, len(config.Inbound.Wireguard.PrivateKey))
 	}
 }
