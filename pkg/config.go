@@ -23,6 +23,45 @@ import (
 const SemgrepHostnameEnvVar = "SEMGREP_HOSTNAME"
 const DefaultSemgrepHostname = "semgrep.dev"
 const SemgrepWireguardPeerFormat = "wireguard.%s:51820"
+const PrivateKeyEnvVar = "SEMGREP_NETWORK_BROKER_PRIVATE_KEY"
+const PrivateKeyPathEnvVar = PrivateKeyEnvVar + "_PATH"
+const privateKeyConfigKey = "inbound.wireguard.privateKey"
+
+const WireguardPrivateKeySize = 32 // bytes; 44 characters in base64
+
+// Accepts any whole multiple of the key size so legacy concatenated keys (see GenerateConfig) still load.
+// An empty key is caught by struct validation at tunnel start.
+func validateWireguardPrivateKey(key SensitiveBase64String, source string) error {
+	if len(key)%WireguardPrivateKeySize != 0 {
+		return fmt.Errorf("invalid WireGuard private key from %s: expected 32 bytes (44 base64 characters), got %d bytes. Generate a key with 'semgrep-network-broker genkey'", source, len(key))
+	}
+	return nil
+}
+
+// Returns the base64 private key from the environment (if any) and a description of its source.
+// The plain variable wins over _PATH. Whitespace is trimmed so files with a trailing newline work.
+func loadPrivateKeyFromEnv() (string, string, error) {
+	if value := strings.TrimSpace(os.Getenv(PrivateKeyEnvVar)); value != "" {
+		return value, PrivateKeyEnvVar + " environment variable", nil
+	}
+
+	path := os.Getenv(PrivateKeyPathEnvVar)
+	if path == "" {
+		return "", "", nil
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read private key file %q named by %s: %w", path, PrivateKeyPathEnvVar, err)
+	}
+
+	value := strings.TrimSpace(string(data))
+	if value == "" {
+		return "", "", fmt.Errorf("private key file %q named by %s is empty", path, PrivateKeyPathEnvVar)
+	}
+
+	return value, fmt.Sprintf("file %q (%s)", path, PrivateKeyPathEnvVar), nil
+}
 
 func getSemgrepHostname() string {
 	hostname := os.Getenv(SemgrepHostnameEnvVar)
@@ -307,6 +346,8 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		},
 	}
 
+	privateKeySource := "config" // for error messages
+
 	// Step 1: Apply config values encoded in broker token (if provided)
 	tokenString, err := LoadTokenFromEnv()
 	if err != nil {
@@ -321,6 +362,8 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 
 		config.Inbound.Wireguard.LocalAddress = token.WireguardCredential.LocalAddress
 		config.Inbound.Wireguard.PrivateKey = token.WireguardCredential.PrivateKey
+		privateKeySource = "broker token"
+		log.WithField("source", "broker_token").Info("Loaded WireGuard private key from broker token")
 	}
 
 	// Step 2: Apply config values from semgrep.dev/api/broker/{deployment_id}/default-config, if a deployment ID is provided
@@ -366,12 +409,42 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 			return nil, fmt.Errorf("failed to merge config file '%s': %v", configFiles[i], err)
 		}
 	}
+
+	// Step 4: Apply private key from the environment if provided (takes precedence over all other sources).
+	// Set on viper before unmarshalling so a stale or malformed config file key is never decoded.
+	privateKeyEnv, privateKeyEnvSource, err := loadPrivateKeyFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	if privateKeyEnv != "" {
+		if viper.IsSet(privateKeyConfigKey) {
+			log.WithField("source", "environment_variable").Warnf("%s overriding private key from config file", privateKeyEnvSource)
+		} else if len(config.Inbound.Wireguard.PrivateKey) > 0 {
+			log.WithField("source", "environment_variable").Warnf("%s overriding private key from %s", privateKeyEnvSource, privateKeySource)
+		}
+
+		if _, err := base64.StdEncoding.DecodeString(privateKeyEnv); err != nil {
+			return nil, fmt.Errorf("failed to decode private key from %s: %v", privateKeyEnvSource, err)
+		}
+
+		viper.Set(privateKeyConfigKey, privateKeyEnv)
+		privateKeySource = privateKeyEnvSource
+		log.WithField("source", "environment_variable").Infof("Loaded WireGuard private key from %s", privateKeyEnvSource)
+	} else if viper.IsSet(privateKeyConfigKey) {
+		privateKeySource = "config file"
+	}
+
 	if err := viper.Unmarshal(config, viper.DecodeHook(
 		mapstructure.ComposeDecodeHookFunc(base64StringDecodeHook, httpMethodsDecodeHook))); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
-	// Step 4: Resolve TXT record(s) of wireguard peers, fill in config values if not set in a config file
+	// Validate the key length regardless of source; otherwise a bad key only surfaces as a panic in GenerateConfig
+	if err := validateWireguardPrivateKey(config.Inbound.Wireguard.PrivateKey, privateKeySource); err != nil {
+		return nil, err
+	}
+
+	// Step 5: Resolve TXT record(s) of wireguard peers, fill in config values if not set in a config file
 	if !config.Inbound.Wireguard.DisablePeerSettingsDnsLookup {
 		for i := range config.Inbound.Wireguard.Peers {
 			peer := &config.Inbound.Wireguard.Peers[i]
@@ -427,7 +500,7 @@ func LoadConfig(configFiles []string, deploymentId int) (*Config, error) {
 		}
 	}
 
-	// Step 5: Apply default values to any remaining unset config fields
+	// Step 6: Apply default values to any remaining unset config fields
 	defaults.SetDefaults(config)
 
 	if err := PopulateAllowLists(config); err != nil {
