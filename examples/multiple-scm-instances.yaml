@@ -1,0 +1,25 @@
+# Two GitHub Enterprise instances and a GitLab reached through one broker.
+#
+# Each entry is identified by its type and baseUrl. When the broker is started with
+# several -c files, entries sharing both are merged field by field and later files win.
+#
+# Run with: semgrep-network-broker -c examples/multiple-scm-instances.yaml
+
+inbound:
+  wireguard:
+    localAddress: <from your broker token>
+    privateKey: <from your broker token>
+  scms:
+    - type: github
+      baseUrl: https://github.example.com/api/v3
+      token: <github token>
+
+    - type: github
+      baseUrl: https://github-eu.example.com/api/v3
+      token: <github token>
+      # Lets Semgrep read file contents and write autofix commits on this instance only.
+      allowCodeAccess: true
+
+    - type: gitlab
+      baseUrl: https://gitlab.example.com/api/v4
+      token: <gitlab token>
