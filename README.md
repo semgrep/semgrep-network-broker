@@ -113,6 +113,39 @@ $ docker run \
 
 Refer to the [network broker docs on semgrep.dev](https://semgrep.dev/docs/semgrep-ci/network-broker) for more detail on docker setup.
 
+### SCMs
+
+`inbound.scms` lists the source control instances Semgrep should reach. Each entry names
+its own `type`, so a deployment can declare several instances of the same provider:
+
+```yaml
+inbound:
+  scms:
+    - type: github
+      baseUrl: https://github.example.com/api/v3
+      token: <token>
+    - type: github
+      baseUrl: https://github-eu.example.com/api/v3
+      token: <token>
+      allowCodeAccess: true
+    - type: gitlab
+      baseUrl: https://gitlab.example.com/api/v4
+      token: <token>
+```
+
+`type` is one of `github`, `gitlab`, `bitbucket` or `azuredevops`. An entry adds the same
+allowlist endpoints that the matching section below documents, and `allowCodeAccess` works
+the same way per entry.
+
+An entry is identified by its `type` and `baseUrl`. When the broker is started with
+several config files, entries sharing both are merged field by field with later files
+winning, and entries differing in either are kept side by side. Both fields are required.
+
+The `github`, `gitlab`, `bitbucket` and `azuredevops` sections below remain supported and
+can be combined with `scms`, as long as they name different instances. Declaring the same
+`type` and `baseUrl` both ways is rejected at startup, because the two would generate
+separate allowlists and the more permissive `allowCodeAccess` would win.
+
 ### GitHub
 
 The `github` configuration section simplifies granting Semgrep access to leave PR comments.

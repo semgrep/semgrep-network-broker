@@ -372,3 +372,359 @@ func TestPrivateKeyLegacyConcatenatedKeysAccepted(t *testing.T) {
 		t.Errorf("expected %d byte key, got %d", 2*WireguardPrivateKeySize, len(config.Inbound.Wireguard.PrivateKey))
 	}
 }
+
+// LoadConfig merges into viper's package-level config, so each case starts and leaves a
+// clean one. The peer DNS lookup is off because these cases only exercise config merging.
+func loadConfigFiles(t *testing.T, bodies ...string) (*Config, error) {
+	t.Helper()
+
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+
+	dir := t.TempDir()
+	paths := []string{filepath.Join(dir, "config-base.yaml")}
+	bodies = append([]string{"inbound:\n  wireguard:\n    disablePeerSettingsDnsLookup: true\n"}, bodies...)
+
+	for i, body := range bodies {
+		if i > 0 {
+			paths = append(paths, filepath.Join(dir, fmt.Sprintf("config-%d.yaml", i)))
+		}
+		if err := os.WriteFile(paths[i], []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return LoadConfig(paths, 0)
+}
+
+func mustLoadConfigFiles(t *testing.T, bodies ...string) *Config {
+	t.Helper()
+
+	config, err := loadConfigFiles(t, bodies...)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	return config
+}
+
+const scmsGitHubA = `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh-a.example.com/api/v3
+`
+
+func TestSCMsAcrossFilesAccumulate(t *testing.T) {
+	config := mustLoadConfigFiles(t, scmsGitHubA, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh-b.example.com/api/v3
+`)
+
+	if len(config.Inbound.SCMs) != 2 {
+		t.Fatalf("expected 2 scms, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+
+	// Both instances reach allowlist generation, not just the last file's.
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh-a.example.com/api/v3/repos/o/r", true)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh-b.example.com/api/v3/repos/o/r", true)
+}
+
+func TestSCMsSameBaseUrlAmend(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      token: from-first
+      allowCodeAccess: true
+`, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      token: from-second
+`)
+
+	if len(config.Inbound.SCMs) != 1 {
+		t.Fatalf("expected 1 scm, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+
+	scm := config.Inbound.SCMs[0]
+	if scm.Token != "from-second" {
+		t.Errorf("token was %q, expected the later file to win", scm.Token)
+	}
+	if !scm.AllowCodeAccess {
+		t.Error("allowCodeAccess was cleared by a file that did not mention it")
+	}
+}
+
+func TestSCMsAllowCodeAccessClearedExplicitly(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      allowCodeAccess: true
+`, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      allowCodeAccess: false
+`)
+
+	if config.Inbound.SCMs[0].AllowCodeAccess {
+		t.Error("an explicit allowCodeAccess: false did not clear the flag")
+	}
+
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh.example.com/api/v3/repos/o/r/contents", false)
+}
+
+func TestSCMsCoexistWithProviderKey(t *testing.T) {
+	config := mustLoadConfigFiles(t, scmsGitHubA, `inbound:
+  github:
+    baseUrl: https://gh-legacy.example.com/api/v3
+`)
+
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh-a.example.com/api/v3/repos/o/r", true)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh-legacy.example.com/api/v3/repos/o/r", true)
+}
+
+func TestSCMsRejectBadEntries(t *testing.T) {
+	for name, body := range map[string]string{
+		"unknown type": `inbound:
+  scms:
+    - type: gitbucket
+      baseUrl: https://scm.example.com
+`,
+		"missing baseUrl": `inbound:
+  scms:
+    - type: github
+`,
+		"not a list": `inbound:
+  scms:
+    type: github
+    baseUrl: https://scm.example.com
+`,
+		// A misspelled allowCodeAccess would otherwise merge in as a stray key and leave
+		// the real flag as an earlier file set it.
+		"unknown key": `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com
+      allowCodeAcess: false
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := loadConfigFiles(t, body); err == nil {
+				t.Error("expected an error, got none")
+			}
+		})
+	}
+}
+
+func TestSCMsRejectProviderKeyOverlap(t *testing.T) {
+	_, err := loadConfigFiles(t, `inbound:
+  github:
+    baseUrl: https://gh.example.com/api/v3
+    allowCodeAccess: false
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      allowCodeAccess: true
+`)
+
+	// Left to merge, the two would generate separate allowlists and the permissive
+	// allowCodeAccess would win.
+	if err == nil {
+		t.Fatal("expected the duplicate SCM to be rejected, got no error")
+	}
+}
+
+func TestSCMsBaseUrlHostIsCaseInsensitive(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://GH.example.com/api/v3
+      allowCodeAccess: true
+`, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      allowCodeAccess: false
+`)
+
+	if len(config.Inbound.SCMs) != 1 {
+		t.Fatalf("expected the host casing to be ignored, got %v entries: %+v",
+			len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+
+	if config.Inbound.SCMs[0].AllowCodeAccess {
+		t.Error("allowCodeAccess survived a later file that cleared it")
+	}
+}
+
+func TestSCMsBaseUrlPathIsCanonicalized(t *testing.T) {
+	// Spellings that url.URL.JoinPath reduces to /api/v3, and so generate rules
+	// indistinguishable from the first file's.
+	for _, baseURL := range []string{
+		"https://gh.example.com/api/v3/",
+		"https://gh.example.com/api/v3//",
+		"https://gh.example.com/api/v3/.",
+		"https://gh.example.com/api/v4/../v3",
+	} {
+		t.Run(baseURL, func(t *testing.T) {
+			config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      token: from-first
+      allowCodeAccess: true
+`, fmt.Sprintf(`inbound:
+  scms:
+    - type: github
+      baseUrl: %s
+      token: from-second
+      allowCodeAccess: false
+`, baseURL))
+
+			if len(config.Inbound.SCMs) != 1 {
+				t.Fatalf("expected the path spelling to be ignored, got %v entries: %+v",
+					len(config.Inbound.SCMs), config.Inbound.SCMs)
+			}
+
+			if config.Inbound.SCMs[0].AllowCodeAccess {
+				t.Error("allowCodeAccess survived a later file that cleared it")
+			}
+
+			assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh.example.com/api/v3/repos/o/r/contents", false)
+
+			// The shadowed entry would otherwise keep injecting the superseded token.
+			item, ok := config.Inbound.Allowlist.FindMatch("GET", urlMustParse("https://gh.example.com/api/v3/repos/o/r"))
+			if !ok {
+				t.Fatal("expected the merged scm to still generate an allowlist")
+			}
+			if got := item.SetRequestHeaders["Authorization"]; got != "Bearer from-second" {
+				t.Errorf("Authorization was %q, expected the later file's token", got)
+			}
+		})
+	}
+}
+
+func TestSCMsDistinctBaseUrlPathsStaySeparate(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`)
+
+	if len(config.Inbound.SCMs) != 2 {
+		t.Fatalf("expected 2 scms, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+}
+
+func TestSCMsRejectProviderKeyOverlapAcrossPathSpellings(t *testing.T) {
+	_, err := loadConfigFiles(t, `inbound:
+  github:
+    baseUrl: https://gh.example.com/api/v3
+    allowCodeAccess: true
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3/
+      allowCodeAccess: false
+`)
+
+	if err == nil {
+		t.Fatal("expected the duplicate SCM to be rejected, got no error")
+	}
+}
+
+func TestSCMsRejectSharedGitHost(t *testing.T) {
+	for name, body := range map[string]string{
+		"github pair": `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+      allowCodeAccess: true
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`,
+		"gitlab pair": `inbound:
+  scms:
+    - type: gitlab
+      baseUrl: https://scm.example.com/tenant-a/api/v4
+    - type: gitlab
+      baseUrl: https://scm.example.com/tenant-b/api/v4
+      allowCodeAccess: true
+`,
+		"bitbucket pair": `inbound:
+  scms:
+    - type: bitbucket
+      baseUrl: https://scm.example.com/a/rest/api/1.0
+      allowCodeAccess: true
+    - type: bitbucket
+      baseUrl: https://scm.example.com/b/rest/api/1.0
+      allowCodeAccess: true
+`,
+		// The clone rules collide whichever section declares the instance.
+		"provider key and list entry": `inbound:
+  github:
+    baseUrl: https://scm.example.com/tenant-a/api/v3
+    allowCodeAccess: true
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := loadConfigFiles(t, body); err == nil {
+				t.Error("expected the shared git host to be rejected, got no error")
+			}
+		})
+	}
+}
+
+func TestSCMsAllowSharedHostWithoutCodeAccess(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`)
+
+	if len(config.Inbound.SCMs) != 2 {
+		t.Fatalf("expected 2 scms, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "POST", "https://scm.example.com/o/r/git-upload-pack", false)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://scm.example.com/tenant-a/api/v3/repos/o/r", true)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://scm.example.com/tenant-b/api/v3/repos/o/r", true)
+}
+
+func TestSCMsAllowSharedHostForAzureDevOps(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: azuredevops
+      baseUrl: https://ado.example.com/org-a
+      token: token-a
+      allowCodeAccess: true
+    - type: azuredevops
+      baseUrl: https://ado.example.com/org-b
+      token: token-b
+      allowCodeAccess: true
+`)
+
+	// Azure DevOps keeps the base URL path in its clone rules, so each org gets its own.
+	for _, tc := range []struct{ url, token string }{
+		{"https://ado.example.com/org-a/ns/proj/_git/repo/git-upload-pack", "Basic " + base64.StdEncoding.EncodeToString([]byte("token-a"))},
+		{"https://ado.example.com/org-b/ns/proj/_git/repo/git-upload-pack", "Basic " + base64.StdEncoding.EncodeToString([]byte("token-b"))},
+	} {
+		item, ok := config.Inbound.Allowlist.FindMatch("POST", urlMustParse(tc.url))
+		if !ok {
+			t.Fatalf("%v was not allowed", tc.url)
+		}
+		if got := item.SetRequestHeaders["Authorization"]; got != tc.token {
+			t.Errorf("%v got Authorization %q, expected %q", tc.url, got, tc.token)
+		}
+	}
+}
