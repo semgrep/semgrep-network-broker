@@ -560,3 +560,80 @@ func TestSCMsBaseUrlHostIsCaseInsensitive(t *testing.T) {
 		t.Error("allowCodeAccess survived a later file that cleared it")
 	}
 }
+
+func TestSCMsBaseUrlPathIsCanonicalized(t *testing.T) {
+	// Spellings that url.URL.JoinPath reduces to /api/v3, and so generate rules
+	// indistinguishable from the first file's.
+	for _, baseURL := range []string{
+		"https://gh.example.com/api/v3/",
+		"https://gh.example.com/api/v3//",
+		"https://gh.example.com/api/v3/.",
+		"https://gh.example.com/api/v4/../v3",
+	} {
+		t.Run(baseURL, func(t *testing.T) {
+			config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3
+      token: from-first
+      allowCodeAccess: true
+`, fmt.Sprintf(`inbound:
+  scms:
+    - type: github
+      baseUrl: %s
+      token: from-second
+      allowCodeAccess: false
+`, baseURL))
+
+			if len(config.Inbound.SCMs) != 1 {
+				t.Fatalf("expected the path spelling to be ignored, got %v entries: %+v",
+					len(config.Inbound.SCMs), config.Inbound.SCMs)
+			}
+
+			if config.Inbound.SCMs[0].AllowCodeAccess {
+				t.Error("allowCodeAccess survived a later file that cleared it")
+			}
+
+			assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://gh.example.com/api/v3/repos/o/r/contents", false)
+
+			// The shadowed entry would otherwise keep injecting the superseded token.
+			item, ok := config.Inbound.Allowlist.FindMatch("GET", urlMustParse("https://gh.example.com/api/v3/repos/o/r"))
+			if !ok {
+				t.Fatal("expected the merged scm to still generate an allowlist")
+			}
+			if got := item.SetRequestHeaders["Authorization"]; got != "Bearer from-second" {
+				t.Errorf("Authorization was %q, expected the later file's token", got)
+			}
+		})
+	}
+}
+
+func TestSCMsDistinctBaseUrlPathsStaySeparate(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`)
+
+	if len(config.Inbound.SCMs) != 2 {
+		t.Fatalf("expected 2 scms, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+}
+
+func TestSCMsRejectProviderKeyOverlapAcrossPathSpellings(t *testing.T) {
+	_, err := loadConfigFiles(t, `inbound:
+  github:
+    baseUrl: https://gh.example.com/api/v3
+    allowCodeAccess: true
+  scms:
+    - type: github
+      baseUrl: https://gh.example.com/api/v3/
+      allowCodeAccess: false
+`)
+
+	if err == nil {
+		t.Fatal("expected the duplicate SCM to be rejected, got no error")
+	}
+}

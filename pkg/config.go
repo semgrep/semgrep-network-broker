@@ -558,13 +558,22 @@ func mergeConfigFile(path string, scms *[]map[string]any) error {
 
 // An SCM is identified by its type and base URL, both of which a config states anyway, so
 // one file can amend another's entry without anyone naming it. Scheme and host are
-// compared case-insensitively per RFC 3986; the path is case-sensitive and is left alone.
-// Map keys are lowercase because viper has already flattened their case.
+// compared case-insensitively per RFC 3986. The path keeps its case but is cleaned the way
+// url.URL.JoinPath cleans it, because that is what the allowlist builders call: two base
+// URLs that generate the same rules have to be the same SCM here, or one entry silently
+// shadows the other and the more permissive rules win. Map keys are lowercase because
+// viper has already flattened their case.
 func scmKey(scmType, baseURL string) string {
 	if parsed, err := url.Parse(baseURL); err == nil && parsed.Host != "" {
 		parsed.Scheme = strings.ToLower(parsed.Scheme)
 		parsed.Host = strings.ToLower(parsed.Host)
-		baseURL = parsed.String()
+
+		// JoinPath resolves dot segments but keeps a trailing slash, which the builders
+		// drop once they append an endpoint.
+		canonical := parsed.JoinPath()
+		canonical.Path = strings.TrimSuffix(canonical.Path, "/")
+		canonical.RawPath = strings.TrimSuffix(canonical.RawPath, "/")
+		baseURL = canonical.String()
 	}
 
 	return strings.ToLower(scmType) + " " + baseURL
