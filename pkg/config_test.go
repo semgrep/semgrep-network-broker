@@ -637,3 +637,94 @@ func TestSCMsRejectProviderKeyOverlapAcrossPathSpellings(t *testing.T) {
 		t.Fatal("expected the duplicate SCM to be rejected, got no error")
 	}
 }
+
+func TestSCMsRejectSharedGitHost(t *testing.T) {
+	for name, body := range map[string]string{
+		"github pair": `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+      allowCodeAccess: true
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`,
+		"gitlab pair": `inbound:
+  scms:
+    - type: gitlab
+      baseUrl: https://scm.example.com/tenant-a/api/v4
+    - type: gitlab
+      baseUrl: https://scm.example.com/tenant-b/api/v4
+      allowCodeAccess: true
+`,
+		"bitbucket pair": `inbound:
+  scms:
+    - type: bitbucket
+      baseUrl: https://scm.example.com/a/rest/api/1.0
+      allowCodeAccess: true
+    - type: bitbucket
+      baseUrl: https://scm.example.com/b/rest/api/1.0
+      allowCodeAccess: true
+`,
+		// The clone rules collide whichever section declares the instance.
+		"provider key and list entry": `inbound:
+  github:
+    baseUrl: https://scm.example.com/tenant-a/api/v3
+    allowCodeAccess: true
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := loadConfigFiles(t, body); err == nil {
+				t.Error("expected the shared git host to be rejected, got no error")
+			}
+		})
+	}
+}
+
+func TestSCMsAllowSharedHostWithoutCodeAccess(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: github
+      baseUrl: https://scm.example.com/tenant-a/api/v3
+    - type: github
+      baseUrl: https://scm.example.com/tenant-b/api/v3
+`)
+
+	if len(config.Inbound.SCMs) != 2 {
+		t.Fatalf("expected 2 scms, got %v: %+v", len(config.Inbound.SCMs), config.Inbound.SCMs)
+	}
+
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "POST", "https://scm.example.com/o/r/git-upload-pack", false)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://scm.example.com/tenant-a/api/v3/repos/o/r", true)
+	assertAllowlistMatch(t, &config.Inbound.Allowlist, "GET", "https://scm.example.com/tenant-b/api/v3/repos/o/r", true)
+}
+
+func TestSCMsAllowSharedHostForAzureDevOps(t *testing.T) {
+	config := mustLoadConfigFiles(t, `inbound:
+  scms:
+    - type: azuredevops
+      baseUrl: https://ado.example.com/org-a
+      token: token-a
+      allowCodeAccess: true
+    - type: azuredevops
+      baseUrl: https://ado.example.com/org-b
+      token: token-b
+      allowCodeAccess: true
+`)
+
+	// Azure DevOps keeps the base URL path in its clone rules, so each org gets its own.
+	for _, tc := range []struct{ url, token string }{
+		{"https://ado.example.com/org-a/ns/proj/_git/repo/git-upload-pack", "Basic " + base64.StdEncoding.EncodeToString([]byte("token-a"))},
+		{"https://ado.example.com/org-b/ns/proj/_git/repo/git-upload-pack", "Basic " + base64.StdEncoding.EncodeToString([]byte("token-b"))},
+	} {
+		item, ok := config.Inbound.Allowlist.FindMatch("POST", urlMustParse(tc.url))
+		if !ok {
+			t.Fatalf("%v was not allowed", tc.url)
+		}
+		if got := item.SetRequestHeaders["Authorization"]; got != tc.token {
+			t.Errorf("%v got Authorization %q, expected %q", tc.url, got, tc.token)
+		}
+	}
+}

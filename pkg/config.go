@@ -675,6 +675,53 @@ func validateSCMs(config *InboundProxyConfig) error {
 		}
 	}
 
+	return validateGitRuleOrigins(config)
+}
+
+// The git smart transfer protocol serves paths off the host root, so these types build
+// their clone rules from scheme and host and drop the base URL path. Azure DevOps keeps
+// the path in its clone rules and returns "", meaning its instances never collide.
+func gitRuleOrigin(typ SCMType, baseURL string) string {
+	switch typ {
+	case SCMTypeGitHub, SCMTypeGitLab, SCMTypeBitBucket:
+	default:
+		return ""
+	}
+
+	parsed, err := url.Parse(baseURL)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+
+	return strings.ToLower(parsed.Scheme + "://" + parsed.Host)
+}
+
+// Two instances of one type on a single host generate identical clone rules, and
+// Allowlist.FindMatch returns the first match, so the first entry's rules and token would
+// serve both. Instances without code access generate no clone rules, so a host where no
+// instance enables it has nothing to collide.
+func validateGitRuleOrigins(config *InboundProxyConfig) error {
+	instances := config.scmInstances()
+
+	for i, a := range instances {
+		origin := gitRuleOrigin(a.typ, a.baseURL)
+		if origin == "" {
+			continue
+		}
+
+		for _, b := range instances[i+1:] {
+			if b.typ != a.typ || gitRuleOrigin(b.typ, b.baseURL) != origin {
+				continue
+			}
+			if !a.allowCodeAccess && !b.allowCodeAccess {
+				continue
+			}
+
+			return fmt.Errorf("%v instances %v and %v share host %v: git clone rules are built from the host alone, so both would generate the same rules and the first entry's token would serve both. Give each instance its own host, or leave allowCodeAccess off on every instance on this host",
+				a.typ, a.baseURL, b.baseURL, origin)
+		}
+	}
+
 	return nil
 }
 
