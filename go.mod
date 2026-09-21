@@ -6,8 +6,8 @@ require (
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/dunglas/go-urlpattern v0.0.0-20260421141449-cbab7cf1e16d
 	github.com/gin-gonic/gin v1.11.0
+	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/mcuadros/go-defaults v1.2.0
-	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/cobra v1.10.2
@@ -35,7 +35,6 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
-	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
