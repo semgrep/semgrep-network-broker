@@ -1679,8 +1679,13 @@ func buildAzureDevOpsAllowlist(scm scmInstance) (Allowlist, error) {
 		},
 		// namespace webhooks
 		AllowlistItem{
-			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/:project/_apis/hooks/subscriptions").String(),
-			Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/hooks/subscriptions").String(),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+			SetRequestHeaders: headers,
+		},
+		AllowlistItem{
+			URL:               azureDevOpsBaseUrl.JoinPath("/:namespace/_apis/hooks/subscriptions/:subscriptionId").String(),
+			Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
 			SetRequestHeaders: headers,
 		},
 		// list teams
