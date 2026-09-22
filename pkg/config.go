@@ -90,6 +90,12 @@ func (sbs SensitiveBase64String) MarshalJSON() ([]byte, error) {
 	return json.Marshal(sbs.String())
 }
 
+type SensitiveString string
+
+func (ss SensitiveString) MarshalJSON() ([]byte, error) {
+	return json.Marshal(RedactedString)
+}
+
 var base64StringType = reflect.TypeOf(Base64String(nil))
 var sensitiveBase64StringType = reflect.TypeOf(SensitiveBase64String(nil))
 
@@ -230,15 +236,30 @@ func httpMethodsDecodeHook(f reflect.Type, t reflect.Type, data interface{}) (in
 	return ParseHttpMethods(methods), nil
 }
 
+type RequestHeaders map[string]string
+
+func (headers RequestHeaders) MarshalJSON() ([]byte, error) {
+	if headers == nil {
+		return json.Marshal(map[string]string(nil))
+	}
+
+	redacted := make(map[string]string, len(headers))
+	for name := range headers {
+		redacted[name] = RedactedString
+	}
+
+	return json.Marshal(redacted)
+}
+
 type AllowlistItem struct {
-	URL                   string            `mapstructure:"url" json:"url"`
-	Methods               HttpMethods       `mapstructure:"methods" json:"methods"`
-	SetRequestHeaders     map[string]string `mapstructure:"setRequestHeaders" json:"setRequestHeaders"`
-	RemoveResponseHeaders []string          `mapstructure:"removeResponseHeaders" json:"removeRequestHeaders"`
-	LogRequestBody        bool              `mapstructure:"logRequestBody" json:"logRequestBody"`
-	LogRequestHeaders     bool              `mapstructure:"logRequestHeaders" json:"logRequestHeaders"`
-	LogResponseBody       bool              `mapstructure:"logResponseBody" json:"logResponseBody"`
-	LogResponseHeaders    bool              `mapstructure:"logResponseHeaders" json:"logResponseHeaders"`
+	URL                   string         `mapstructure:"url" json:"url"`
+	Methods               HttpMethods    `mapstructure:"methods" json:"methods"`
+	SetRequestHeaders     RequestHeaders `mapstructure:"setRequestHeaders" json:"setRequestHeaders"`
+	RemoveResponseHeaders []string       `mapstructure:"removeResponseHeaders" json:"removeRequestHeaders"`
+	LogRequestBody        bool           `mapstructure:"logRequestBody" json:"logRequestBody"`
+	LogRequestHeaders     bool           `mapstructure:"logRequestHeaders" json:"logRequestHeaders"`
+	LogResponseBody       bool           `mapstructure:"logResponseBody" json:"logResponseBody"`
+	LogResponseHeaders    bool           `mapstructure:"logResponseHeaders" json:"logResponseHeaders"`
 }
 
 type Allowlist []AllowlistItem
@@ -260,27 +281,27 @@ type HeartbeatConfig struct {
 }
 
 type GitHub struct {
-	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           SensitiveString `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type GitLab struct {
-	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           SensitiveString `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type BitBucket struct {
-	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           SensitiveString `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type AzureDevOps struct {
-	BaseURL         string `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool   `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           SensitiveString `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type HttpClientConfig struct {
@@ -737,10 +758,10 @@ const (
 // SCM is one entry of inbound.scms. Several entries may share a Type, which is what the
 // single-provider keys cannot express.
 type SCM struct {
-	Type            SCMType `mapstructure:"type" json:"type"`
-	BaseURL         string  `mapstructure:"baseUrl" json:"baseUrl"`
-	Token           string  `mapstructure:"token" json:"token"`
-	AllowCodeAccess bool    `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	Type            SCMType         `mapstructure:"type" json:"type"`
+	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
+	Token           SensitiveString `mapstructure:"token" json:"token"`
+	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
 }
 
 type scmInstance struct {
@@ -760,7 +781,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 		instances = append(instances, scmInstance{
 			typ:             scm.Type,
 			baseURL:         scm.BaseURL,
-			token:           scm.Token,
+			token:           string(scm.Token),
 			allowCodeAccess: scm.AllowCodeAccess,
 		})
 	}
@@ -769,7 +790,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 		instances = append(instances, scmInstance{
 			typ:             SCMTypeGitHub,
 			baseURL:         config.GitHub.BaseURL,
-			token:           config.GitHub.Token,
+			token:           string(config.GitHub.Token),
 			allowCodeAccess: config.GitHub.AllowCodeAccess,
 		})
 	}
@@ -778,7 +799,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 		instances = append(instances, scmInstance{
 			typ:             SCMTypeGitLab,
 			baseURL:         config.GitLab.BaseURL,
-			token:           config.GitLab.Token,
+			token:           string(config.GitLab.Token),
 			allowCodeAccess: config.GitLab.AllowCodeAccess,
 		})
 	}
@@ -787,7 +808,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 		instances = append(instances, scmInstance{
 			typ:             SCMTypeBitBucket,
 			baseURL:         config.BitBucket.BaseURL,
-			token:           config.BitBucket.Token,
+			token:           string(config.BitBucket.Token),
 			allowCodeAccess: config.BitBucket.AllowCodeAccess,
 		})
 	}
@@ -796,7 +817,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 		instances = append(instances, scmInstance{
 			typ:             SCMTypeAzureDevOps,
 			baseURL:         config.AzureDevOps.BaseURL,
-			token:           config.AzureDevOps.Token,
+			token:           string(config.AzureDevOps.Token),
 			allowCodeAccess: config.AzureDevOps.AllowCodeAccess,
 		})
 	}
