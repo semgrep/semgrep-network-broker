@@ -264,7 +264,7 @@ Adding a `gitlab` field to the config implicitly adds these endpoints to the all
 - POST `https://gitlab.example.com/api/v4/projects/:project/hooks`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - POST `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes`
-- PUT `https://gitlab.example.com/api/v4/groups/:namespace/hooks`
+- PUT `https://gitlab.example.com/api/v4/groups/:namespace/hooks/:hook`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion`
 - PUT `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note`
 - DELETE `https://gitlab.example.com/api/v4/groups/:namespace/hooks/:hook`

@@ -1226,12 +1226,12 @@ func buildGitLabAllowlist(scm scmInstance) (Allowlist, error) {
 		// Group webhooks
 		AllowlistItem{
 			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks").String(),
-			Methods:           ParseHttpMethods([]string{"GET", "POST", "PUT"}),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 			SetRequestHeaders: headers,
 		},
 		AllowlistItem{
 			URL:               gitLabBaseUrl.JoinPath("/groups/:namespace/hooks/:hook").String(),
-			Methods:           ParseHttpMethods([]string{"DELETE"}),
+			Methods:           ParseHttpMethods([]string{"PUT", "DELETE"}),
 			SetRequestHeaders: headers,
 		},
 		// List all members of a group
