@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 )
@@ -625,4 +626,47 @@ func TestAllowlistFindMatchPerformance(t *testing.T) {
 	avgDurationMillis := float64(totalDuration.Nanoseconds()) / float64(len(testUrls)) / 1_000_000
 	t.Logf("Summary: %d matches out of %d URLs", matches, len(testUrls))
 	t.Logf("Average time per lookup: %.1fms", avgDurationMillis)
+}
+
+// GitHub redirects a renamed or transferred repository to its id-addressed
+// form, so every repo-scoped rule has to admit both spellings.
+func TestAllowlistGitHubRepositoryByID(t *testing.T) {
+	allowlist := gitHubAllowlist(t, true)
+
+	const byID = "https://github.example.com/api/v3/repositories/235651"
+
+	assertAllowlistMatch(t, allowlist, "GET", byID, true)
+	assertAllowlistMatch(t, allowlist, "GET", byID+"/installation", true)
+	assertAllowlistMatch(t, allowlist, "POST", byID+"/check-runs", true)
+	assertAllowlistMatch(t, allowlist, "GET", byID+"/contents/README.md", true)
+
+	// Each id-addressed rule carries the methods of the rule it mirrors.
+	assertAllowlistMatch(t, allowlist, "DELETE", byID, false)
+	assertAllowlistMatch(t, allowlist, "GET", byID+"/check-runs", false)
+
+	// The id is digits, so these rules admit no segment the name-addressed
+	// ones would not.
+	assertAllowlistMatch(t, allowlist, "GET", "https://github.example.com/api/v3/repositories/testrepo", false)
+
+	// Git smart-HTTP has no id-addressed form and must not gain one. Asserted
+	// over the rules themselves because the generic /:owner/:repo transfer
+	// rules already match any two segments, id-shaped or not.
+	for _, item := range *allowlist {
+		if strings.Contains(item.URL, `/repositories/:id(\d+)/info/refs`) ||
+			strings.Contains(item.URL, `/repositories/:id(\d+)/git-upload-pack`) {
+			t.Errorf("git transfer rule gained an id-addressed form: %v", item.URL)
+		}
+	}
+}
+
+// The id-addressed rules are derived from the name-addressed ones, so a
+// deployment that withheld code access does not gain it through them.
+func TestAllowlistGitHubRepositoryByIDRequiresCodeAccess(t *testing.T) {
+	allowlist := gitHubAllowlist(t, false)
+
+	const byID = "https://github.example.com/api/v3/repositories/235651"
+
+	assertAllowlistMatch(t, allowlist, "GET", byID, true)
+	assertAllowlistMatch(t, allowlist, "GET", byID+"/contents/README.md", false)
+	assertAllowlistMatch(t, allowlist, "GET", byID+"/commits", false)
 }
