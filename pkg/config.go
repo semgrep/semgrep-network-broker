@@ -1194,7 +1194,35 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 		)
 	}
 
-	return allowlist, nil
+	return appendRepositoryIDRules(allowlist), nil
+}
+
+// GitHub answers a request for a renamed or transferred repository with a
+// redirect to its id-addressed form, keeping everything after the repository
+// segment. These rules are derived from the ones already built so that both
+// spellings carry the same methods, headers and allowCodeAccess gating.
+func appendRepositoryIDRules(allowlist Allowlist) Allowlist {
+	// Only the API rules are redirected this way. The git smart-HTTP rules hang
+	// off the host root and have no id-addressed form.
+	repoSegments := []string{"/repos/:owner/:repo", "/repos/:org/:repo"}
+
+	byID := make(Allowlist, 0, len(allowlist))
+	for _, item := range allowlist {
+		for _, segment := range repoSegments {
+			if !strings.Contains(item.URL, segment) {
+				continue
+			}
+
+			// The id is constrained to digits, so these rules admit no segment
+			// the name-addressed ones would not.
+			mirrored := item
+			mirrored.URL = strings.Replace(item.URL, segment, `/repositories/:id(\d+)`, 1)
+			byID = append(byID, mirrored)
+			break
+		}
+	}
+
+	return append(allowlist, byID...)
 }
 
 func buildGitLabAllowlist(scm scmInstance) (Allowlist, error) {
