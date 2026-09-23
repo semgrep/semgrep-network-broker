@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -725,6 +726,62 @@ func TestSCMsAllowSharedHostForAzureDevOps(t *testing.T) {
 		}
 		if got := item.SetRequestHeaders["Authorization"]; got != tc.token {
 			t.Errorf("%v got Authorization %q, expected %q", tc.url, got, tc.token)
+		}
+	}
+}
+
+func TestConfigJSONRedactsTokensAndHeaderValues(t *testing.T) {
+	const (
+		legacyToken = "legacy-github-token"
+		scmsToken   = "scms-gitlab-token"
+		userHeader  = "user-webhook-secret"
+	)
+
+	config := mustLoadConfigFiles(t, fmt.Sprintf(`inbound:
+  github:
+    baseUrl: https://gh.example.com/api/v3
+    token: %s
+  scms:
+    - type: gitlab
+      baseUrl: https://gl.example.com/api/v4
+      token: %s
+  allowlist:
+    - url: https://app.example.com/hook
+      methods: [POST]
+      setRequestHeaders:
+        X-Webhook-Secret: %s
+`, legacyToken, scmsToken, userHeader))
+
+	encoded, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	dump := string(encoded)
+
+	for _, secret := range []string{legacyToken, scmsToken, userHeader} {
+		if strings.Contains(dump, secret) {
+			t.Errorf("dumped config contains the secret %q", secret)
+		}
+	}
+
+	// viper lowercases map keys read from a config file.
+	for _, name := range []string{"x-webhook-secret", "Authorization", "PRIVATE-TOKEN"} {
+		if !strings.Contains(dump, name) {
+			t.Errorf("dumped config is missing the header name %q", name)
+		}
+	}
+
+	for _, tc := range []struct{ method, url, header, want string }{
+		{"POST", "https://app.example.com/hook", "x-webhook-secret", userHeader},
+		{"GET", "https://gh.example.com/api/v3/repos/o/r", "Authorization", "Bearer " + legacyToken},
+		{"GET", "https://gl.example.com/api/v4/projects/p", "PRIVATE-TOKEN", scmsToken},
+	} {
+		item, ok := config.Inbound.Allowlist.FindMatch(tc.method, urlMustParse(tc.url))
+		if !ok {
+			t.Fatalf("%v was not allowed", tc.url)
+		}
+		if got := item.SetRequestHeaders[tc.header]; got != tc.want {
+			t.Errorf("%v got %v %q, expected %q", tc.url, tc.header, got, tc.want)
 		}
 	}
 }
