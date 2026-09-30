@@ -225,9 +225,11 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - PATCH `https://github.example.com/api/v3/app/hook/config`
 - PATCH `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`
 - PATCH `https://github.example.com/api/v3/repos/:owner/:repo/check-runs/:check_run_id`
+- PATCH `https://github.example.com/api/v3/repos/:owner/:repo/issues/comments/:comment_id`
 - PATCH `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments/:comment_id`
 - PATCH `https://github.example.com/api/v3/repos/:owner/:repo/pulls/comments/:comment_id`
 - PATCH `https://github.example.com/api/v3/repositories/:id(\d+)/check-runs/:check_run_id`
+- PATCH `https://github.example.com/api/v3/repositories/:id(\d+)/issues/comments/:comment_id`
 - PATCH `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/:number/comments/:comment_id`
 - PATCH `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/comments/:comment_id`
 - DELETE `https://github.example.com/api/v3/orgs/:org/hooks/:hook_id`

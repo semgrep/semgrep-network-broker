@@ -670,3 +670,19 @@ func TestAllowlistGitHubRepositoryByIDRequiresCodeAccess(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", byID+"/contents/README.md", false)
 	assertAllowlistMatch(t, allowlist, "GET", byID+"/commits", false)
 }
+
+func TestAllowlistGitHubEditIssueComment(t *testing.T) {
+	allowlist := gitHubAllowlist(t, false)
+
+	const comment = "https://github.example.com/api/v3/repos/testorg/testrepo/issues/comments/987654"
+
+	// Editing does not read repository contents, so it is not gated behind
+	// allowCodeAccess, and it has an id-addressed form like every repo rule.
+	assertAllowlistMatch(t, allowlist, "PATCH", comment, true)
+	assertAllowlistMatch(t, allowlist, "PATCH", "https://github.example.com/api/v3/repositories/235651/issues/comments/987654", true)
+
+	// Negative: the entry is edit-only.
+	assertAllowlistMatch(t, allowlist, "GET", comment, false)
+	assertAllowlistMatch(t, allowlist, "DELETE", comment, false)
+	assertAllowlistMatch(t, allowlist, "POST", comment, false)
+}
