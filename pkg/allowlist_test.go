@@ -671,9 +671,6 @@ func TestAllowlistGitHubRepositoryByIDRequiresCodeAccess(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", byID+"/commits", false)
 }
 
-// A top-level PR comment is an issue comment on GitHub. Semgrep edits its
-// summary comment in place, which needs the issue-comment edit route rather
-// than the review-comment one under /pulls/comments.
 func TestAllowlistGitHubEditIssueComment(t *testing.T) {
 	allowlist := gitHubAllowlist(t, false)
 
