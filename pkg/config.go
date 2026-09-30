@@ -939,6 +939,13 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 			Methods:           ParseHttpMethods([]string{"POST"}),
 			SetRequestHeaders: headers,
 		},
+		// edit issue comment. A top-level PR comment is an issue comment, so
+		// /pulls/comments/:comment_id (review comments) cannot edit it.
+		AllowlistItem{
+			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/comments/:comment_id").String(),
+			Methods:           ParseHttpMethods([]string{"PATCH"}),
+			SetRequestHeaders: headers,
+		},
 		// list organizations
 		AllowlistItem{
 			URL:               gitHubBaseUrl.JoinPath("/organizations").String(),
