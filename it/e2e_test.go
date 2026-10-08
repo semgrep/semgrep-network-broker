@@ -3,6 +3,7 @@ package it
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -120,6 +121,25 @@ func (tc *testClient) AssertStatusAndContent(t *testing.T, method string, rawUrl
 	}
 }
 
+type echoedRequest struct {
+	Host          string
+	RequestURI    string
+	Header        http.Header
+	Body          string
+	ContentLength int64
+}
+
+func echoRequest(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	json.NewEncoder(w).Encode(echoedRequest{
+		Host:          r.Host,
+		RequestURI:    r.RequestURI,
+		Header:        r.Header,
+		Body:          string(body),
+		ContentLength: r.ContentLength,
+	})
+}
+
 func TestWireguardInboundProxy(t *testing.T) {
 	gatewayWireguardPort := mustGetFreePort()
 	gatewayWireguardAddress := mustGetRandomPrivateAddress()
@@ -177,6 +197,7 @@ func TestWireguardInboundProxy(t *testing.T) {
 	internalServer.Any("/introspect/query-params", func(ctx *gin.Context) {
 		ctx.String(200, ctx.Request.URL.RawQuery)
 	})
+	internalServer.Any("/introspect/echo", gin.WrapF(echoRequest))
 
 	internalListener, err := net.Listen("tcp", "127.0.0.1:")
 	if err != nil {
@@ -216,8 +237,9 @@ func TestWireguardInboundProxy(t *testing.T) {
 					Methods: pkg.ParseHttpMethods([]string{"POST"}),
 				},
 				{
-					URL:     internalServerBaseUrl + "/introspect/*",
-					Methods: pkg.ParseHttpMethods([]string{"GET", "POST"}),
+					URL:               internalServerBaseUrl + "/introspect/*",
+					Methods:           pkg.ParseHttpMethods([]string{"GET", "POST"}),
+					SetRequestHeaders: map[string]string{"Private-Token": "configured-token"},
 				},
 			},
 			Heartbeat: pkg.HeartbeatConfig{
@@ -268,6 +290,41 @@ func TestWireguardInboundProxy(t *testing.T) {
 
 	// it should include query params in the proxied request
 	remoteHttpClient.AssertStatusAndContent(t, "GET", fmt.Sprintf("http://[%v]/proxy/%v/introspect/query-params?foo=bar", clientWireguardAddress, internalServerBaseUrl), 200, "foo=bar")
+
+	// it should forward the request with its raw query, configured credentials, and forwarding headers
+	assert := assert.New(t)
+	body := `{"foo": 2}`
+	req, err := http.NewRequest("POST", fmt.Sprintf("http://[%v]/proxy/http://user:pass@%v/introspect/echo?a=1;b=2&c=%%zz", clientWireguardAddress, internalListener.Addr()), strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Forwarded", "for=203.0.113.7")
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	req.Header.Set("X-Forwarded-Host", "client.example")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("Private-Token", "client-token")
+	req.Header.Set("Connection", "X-Hop")
+	req.Header.Set("X-Hop", "1")
+	statusCode, content, err := remoteHttpClient.Request(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(200, statusCode)
+	var echoed echoedRequest
+	if err := json.Unmarshal([]byte(content), &echoed); err != nil {
+		t.Fatalf("decoding %q: %v", content, err)
+	}
+	assert.Equal(internalListener.Addr().String(), echoed.Host)
+	assert.Equal("/introspect/echo?a=1;b=2&c=%zz", echoed.RequestURI)
+	assert.Equal(body, echoed.Body)
+	assert.Equal(int64(len(body)), echoed.ContentLength)
+	assert.Equal([]string{"Basic dXNlcjpwYXNz"}, echoed.Header["Authorization"])
+	assert.Equal([]string{"configured-token"}, echoed.Header["Private-Token"])
+	assert.Equal([]string{"for=203.0.113.7"}, echoed.Header["Forwarded"])
+	assert.Equal([]string{"203.0.113.7, " + gatewayWireguardAddress.String()}, echoed.Header["X-Forwarded-For"])
+	assert.Equal([]string{"client.example"}, echoed.Header["X-Forwarded-Host"])
+	assert.Equal([]string{"https"}, echoed.Header["X-Forwarded-Proto"])
+	assert.NotContains(echoed.Header, "X-Hop")
 }
 
 func TestRelay(t *testing.T) {
@@ -283,6 +340,9 @@ func TestRelay(t *testing.T) {
 	}))
 	defer internalServer2.Close()
 
+	echoServer := httptest.NewServer(http.HandlerFunc(echoRequest))
+	defer echoServer.Close()
+
 	relayPort := mustGetFreePort()
 
 	relayConfig := &pkg.Config{
@@ -290,6 +350,9 @@ func TestRelay(t *testing.T) {
 			Relay: map[string]pkg.FilteredRelayConfig{
 				"always-succeed": {
 					DestinationURL: internalServer.URL,
+				},
+				"echo": {
+					DestinationURL: echoServer.URL + "/hook?dest=1",
 				},
 				"post-jsonpath-foo-bar": {
 					DestinationURL: internalServer.URL,
@@ -388,4 +451,25 @@ func TestRelay(t *testing.T) {
 	assert.Equal(200, resp.StatusCode, "other event should return 200")
 	assert.Equal("1", resp.Header.Get("X-Semgrep-Network-Broker-Relay-Match"), "other event should match")
 	assert.Equal("Server2", bodyBuilder.String(), "other event should be relayed to Server2")
+
+	// it should relay the buffered body to the destination URL, dropping the inbound query
+	body := `{"foo": "bar"}`
+	req, _ = http.NewRequest("POST", fmt.Sprintf("http://127.0.0.1:%v/relay/echo?src=1", relayPort), strings.NewReader(body))
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	req.Header.Set("X-Forwarded-Host", "client.example")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var echoed echoedRequest
+	if err := json.NewDecoder(resp.Body).Decode(&echoed); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(echoServer.Listener.Addr().String(), echoed.Host)
+	assert.Equal("/hook?dest=1", echoed.RequestURI)
+	assert.Equal(body, echoed.Body)
+	assert.Equal(int64(len(body)), echoed.ContentLength)
+	assert.Equal([]string{"203.0.113.7, 127.0.0.1"}, echoed.Header["X-Forwarded-For"])
+	assert.Equal([]string{"client.example"}, echoed.Header["X-Forwarded-Host"])
 }
