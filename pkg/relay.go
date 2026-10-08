@@ -185,10 +185,12 @@ func (config *OutboundProxyConfig) Start() error {
 
 		logger.Info("relay.proxy_request")
 		proxy := httputil.ReverseProxy{
-			Director: func(req *http.Request) {
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				req := pr.Out
 				req.Body = io.NopCloser(buf)
 				req.URL = destinationUrl
 				req.Host = destinationUrl.Host
+				setForwardedHeaders(pr)
 			},
 			ModifyResponse: func(resp *http.Response) error {
 				respLogger := logger

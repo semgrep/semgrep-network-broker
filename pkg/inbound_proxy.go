@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -22,6 +23,24 @@ const healthcheckPath = "/healthcheck"
 const metricsPath = "/metrics"
 const destinationUrlParam = "destinationUrl"
 const proxyPath = "/proxy/*" + destinationUrlParam
+
+var forwardedHeaders = []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"}
+
+func setForwardedHeaders(pr *httputil.ProxyRequest) {
+	for _, name := range forwardedHeaders {
+		if _, set := pr.Out.Header[name]; !set {
+			if values, ok := pr.In.Header[name]; ok {
+				pr.Out.Header[name] = values
+			}
+		}
+	}
+	if clientIP, _, err := net.SplitHostPort(pr.In.RemoteAddr); err == nil {
+		if prior := pr.Out.Header["X-Forwarded-For"]; len(prior) > 0 {
+			clientIP = strings.Join(prior, ", ") + ", " + clientIP
+		}
+		pr.Out.Header.Set("X-Forwarded-For", clientIP)
+	}
+}
 
 func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 	// ensure config is valid
@@ -104,7 +123,8 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 
 		proxy := httputil.ReverseProxy{
 			Transport: instrumentedTransport,
-			Director: func(req *http.Request) {
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				req := pr.Out
 				req.URL = destinationUrl
 				req.Host = destinationUrl.Host
 				if destinationUrl.User != nil {
@@ -118,6 +138,7 @@ func (config *InboundProxyConfig) Start(tnet *netstack.Net) error {
 				for headerName, headerValue := range allowlistMatch.SetRequestHeaders {
 					req.Header.Set(headerName, headerValue)
 				}
+				setForwardedHeaders(pr)
 			},
 			ModifyResponse: func(resp *http.Response) error {
 				resp.Header.Set(proxyResponseHeader, "1")
