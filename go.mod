@@ -4,7 +4,7 @@ go 1.25.5
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1
-	github.com/dunglas/go-urlpattern v0.0.0-20260421141449-cbab7cf1e16d
+	github.com/dunglas/go-urlpattern v1.0.0
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-viper/mapstructure/v2 v2.4.0
 	github.com/mcuadros/go-defaults v1.2.0
