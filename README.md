@@ -237,6 +237,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/compare/:basehead`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/contents/.github/workflows/semgrep.yml`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/installation`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/issues/:number/comments`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/comments/:comment_id/reactions`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)`
@@ -247,6 +248,7 @@ Adding a `github` field to the config implicitly adds these endpoints to the all
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/compare/:basehead`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/contents/.github/workflows/semgrep.yml`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/installation`
+- GET `https://github.example.com/api/v3/repositories/:id(\d+)/issues/:number/comments`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/pulls`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/comments/:comment_id/reactions`
 - GET `https://github.example.com/api/v3/user`
@@ -294,11 +296,17 @@ And if `allowCodeAccess` is set, these endpoints are also added to the allowlist
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/contents/*`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/git/commits/:sha`
 - GET `https://github.example.com/api/v3/repos/:owner/:repo/git/ref/*`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/comments`
+- GET `https://github.example.com/api/v3/repos/:owner/:repo/pulls/:number/files`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/commits`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/contents`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/contents/*`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/git/commits/:sha`
 - GET `https://github.example.com/api/v3/repositories/:id(\d+)/git/ref/*`
+- GET `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/:number`
+- GET `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/:number/comments`
+- GET `https://github.example.com/api/v3/repositories/:id(\d+)/pulls/:number/files`
 - POST `https://github.example.com/:owner/:repo/git-receive-pack`
 - POST `https://github.example.com/:owner/:repo/git-upload-pack`
 - POST `https://github.example.com/api/v3/repos/:owner/:repo/git/blobs`

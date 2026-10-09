@@ -684,3 +684,37 @@ func TestAllowlistGitHubEditIssueComment(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "DELETE", comment, false)
 	assertAllowlistMatch(t, allowlist, "POST", comment, false)
 }
+
+func TestAllowlistGitHubPullRequestReads(t *testing.T) {
+	allowlist := gitHubAllowlist(t, true)
+
+	for _, repo := range []string{
+		"https://github.example.com/api/v3/repos/testorg/testrepo",
+		"https://github.example.com/api/v3/repositories/235651",
+	} {
+		assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42", true)
+		assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42/files", true)
+		assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42/comments", true)
+		assertAllowlistMatch(t, allowlist, "GET", repo+"/issues/42/comments", true)
+	}
+
+	const pr = "https://github.example.com/api/v3/repos/testorg/testrepo/pulls/42"
+
+	assertAllowlistMatch(t, allowlist, "PATCH", pr, false)
+	assertAllowlistMatch(t, allowlist, "GET", pr+"/files/extra", false)
+}
+
+// The PR, its files and its review comments can return repository content.
+func TestAllowlistGitHubPullRequestReadsRequireCodeAccess(t *testing.T) {
+	allowlist := gitHubAllowlist(t, false)
+
+	const repo = "https://github.example.com/api/v3/repos/testorg/testrepo"
+
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42/files", false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42/comments", false)
+
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/issues/42/comments", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/issues/42/comments", true)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/pulls/42/comments", true)
+}

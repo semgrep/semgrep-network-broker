@@ -933,10 +933,10 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 			Methods:           ParseHttpMethods([]string{"GET"}),
 			SetRequestHeaders: headers,
 		},
-		// post issue comment
+		// list and post issue comments
 		AllowlistItem{
 			URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/issues/:number/comments").String(),
-			Methods:           ParseHttpMethods([]string{"POST"}),
+			Methods:           ParseHttpMethods([]string{"GET", "POST"}),
 			SetRequestHeaders: headers,
 		},
 		// edit issue comment
@@ -1217,6 +1217,24 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls").String(),
 				Methods:           ParseHttpMethods([]string{"POST"}),
+				SetRequestHeaders: headers,
+			},
+			// get a PR
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// list PR files
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/files").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// list PR comments
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/comments").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
 		)
