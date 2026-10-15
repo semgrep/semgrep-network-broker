@@ -284,6 +284,7 @@ type GitHub struct {
 	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
 	Token           SensitiveString `mapstructure:"token" json:"token"`
 	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	AllowCodeReview bool            `mapstructure:"allowCodeReview" json:"allowCodeReview"`
 }
 
 type GitLab struct {
@@ -659,6 +660,10 @@ func validateSCMs(config *InboundProxyConfig) error {
 			return fmt.Errorf("%s[%d]: unknown type %q", scmsConfigKey, i, scm.Type)
 		}
 
+		if scm.AllowCodeReview && scm.Type != SCMTypeGitHub {
+			return fmt.Errorf("%s[%d]: allowCodeReview is only supported for github", scmsConfigKey, i)
+		}
+
 		if scm.BaseURL == "" {
 			return fmt.Errorf("%s[%d]: baseUrl is required", scmsConfigKey, i)
 		}
@@ -762,6 +767,7 @@ type SCM struct {
 	BaseURL         string          `mapstructure:"baseUrl" json:"baseUrl"`
 	Token           SensitiveString `mapstructure:"token" json:"token"`
 	AllowCodeAccess bool            `mapstructure:"allowCodeAccess" json:"allowCodeAccess"`
+	AllowCodeReview bool            `mapstructure:"allowCodeReview" json:"allowCodeReview"`
 }
 
 type scmInstance struct {
@@ -769,6 +775,7 @@ type scmInstance struct {
 	baseURL         string
 	token           string
 	allowCodeAccess bool
+	allowCodeReview bool
 }
 
 // Must not mutate config: PopulateAllowLists runs more than once against the same config
@@ -783,6 +790,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 			baseURL:         scm.BaseURL,
 			token:           string(scm.Token),
 			allowCodeAccess: scm.AllowCodeAccess,
+			allowCodeReview: scm.AllowCodeReview,
 		})
 	}
 
@@ -792,6 +800,7 @@ func (config *InboundProxyConfig) scmInstances() []scmInstance {
 			baseURL:         config.GitHub.BaseURL,
 			token:           string(config.GitHub.Token),
 			allowCodeAccess: config.GitHub.AllowCodeAccess,
+			allowCodeReview: config.GitHub.AllowCodeReview,
 		})
 	}
 
@@ -1225,16 +1234,6 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews").String(),
-				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
-				SetRequestHeaders: headers,
-			},
-			AllowlistItem{
-				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews/:review_id/dismissals").String(),
-				Methods:           ParseHttpMethods([]string{"PUT"}),
-				SetRequestHeaders: headers,
-			},
 			// list PR files
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/files").String(),
@@ -1250,13 +1249,29 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 		)
 	}
 
+	if scm.allowCodeReview {
+		// Workflow review decisions can approve PRs and withdraw approvals.
+		allowlist = append(allowlist,
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews/:review_id/dismissals").String(),
+				Methods:           ParseHttpMethods([]string{"PUT"}),
+				SetRequestHeaders: headers,
+			},
+		)
+	}
+
 	return appendRepositoryIDRules(allowlist), nil
 }
 
 // GitHub answers a request for a renamed or transferred repository with a
 // redirect to its id-addressed form, keeping everything after the repository
 // segment. These rules are derived from the ones already built so that both
-// spellings carry the same methods, headers and allowCodeAccess gating.
+// spellings carry the same methods, headers and permission gating.
 func appendRepositoryIDRules(allowlist Allowlist) Allowlist {
 	// Only the API rules are redirected this way. The git smart-HTTP rules hang
 	// off the host root and have no id-addressed form.
