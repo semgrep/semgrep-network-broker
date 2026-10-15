@@ -1225,6 +1225,16 @@ func buildGitHubAllowlist(scm scmInstance) (Allowlist, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews").String(),
+				Methods:           ParseHttpMethods([]string{"GET", "POST"}),
+				SetRequestHeaders: headers,
+			},
+			AllowlistItem{
+				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/reviews/:review_id/dismissals").String(),
+				Methods:           ParseHttpMethods([]string{"PUT"}),
+				SetRequestHeaders: headers,
+			},
 			// list PR files
 			AllowlistItem{
 				URL:               gitHubBaseUrl.JoinPath("/repos/:owner/:repo/pulls/:number/files").String(),

@@ -685,6 +685,35 @@ func TestAllowlistGitHubEditIssueComment(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "POST", comment, false)
 }
 
+func TestAllowlistGitHubPullRequestReviews(t *testing.T) {
+	for _, allowCodeAccess := range []bool{false, true} {
+		allowlist := gitHubAllowlist(t, allowCodeAccess)
+		for _, repo := range []string{
+			"https://github.example.com/api/v3/repos/testorg/testrepo",
+			"https://github.example.com/api/v3/repositories/235651",
+		} {
+			for _, tc := range []struct {
+				method string
+				path   string
+				allow  bool
+			}{
+				{"GET", "/reviews", true},
+				{"POST", "/reviews", true},
+				{"PUT", "/reviews/123/dismissals", true},
+				{"PATCH", "/reviews", false},
+				{"DELETE", "/reviews", false},
+				{"GET", "/reviews/123/dismissals", false},
+				{"POST", "/reviews/123/dismissals", false},
+				{"GET", "/reviews/123", false},
+				{"POST", "/reviews/123/events", false},
+				{"PUT", "/reviews/123/dismissals/extra", false},
+			} {
+				assertAllowlistMatch(t, allowlist, tc.method, repo+"/pulls/42"+tc.path, allowCodeAccess && tc.allow)
+			}
+		}
+	}
+}
+
 func TestAllowlistGitHubPullRequestReads(t *testing.T) {
 	allowlist := gitHubAllowlist(t, true)
 
