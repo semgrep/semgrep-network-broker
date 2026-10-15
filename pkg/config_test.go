@@ -415,6 +415,33 @@ const scmsGitHubA = `inbound:
       baseUrl: https://gh-a.example.com/api/v3
 `
 
+func TestGitHubCodeReviewConfigMerging(t *testing.T) {
+	for _, prefix := range []string{
+		"inbound:\n  github:\n    baseUrl: https://gh.example.com/api/v3\n    ",
+		"inbound:\n  scms:\n    - type: github\n      baseUrl: https://gh.example.com/api/v3\n      ",
+	} {
+		for _, override := range []struct {
+			field string
+			allow bool
+		}{
+			{"token: replacement", true},
+			{"allowCodeReview: false", false},
+		} {
+			config := mustLoadConfigFiles(t, prefix+"allowCodeReview: true\n", prefix+override.field+"\n")
+			assertAllowlistMatch(t, &config.Inbound.Allowlist, "POST", "https://gh.example.com/api/v3/repos/o/r/pulls/42/reviews", override.allow)
+		}
+	}
+}
+
+func TestSCMsRejectCodeReviewForOtherProviders(t *testing.T) {
+	for _, provider := range []SCMType{SCMTypeGitLab, SCMTypeBitBucket, SCMTypeAzureDevOps} {
+		_, err := loadConfigFiles(t, fmt.Sprintf("inbound:\n  scms:\n    - type: %s\n      baseUrl: https://scm.example.com\n      allowCodeReview: true\n", provider))
+		if err == nil || !strings.Contains(err.Error(), "allowCodeReview") {
+			t.Errorf("%s: expected allowCodeReview error, got %v", provider, err)
+		}
+	}
+}
+
 func TestSCMsAcrossFilesAccumulate(t *testing.T) {
 	config := mustLoadConfigFiles(t, scmsGitHubA, `inbound:
   scms:

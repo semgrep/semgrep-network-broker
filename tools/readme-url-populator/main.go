@@ -181,6 +181,24 @@ func main() {
 		urlsRequiringCodeAccess := subtract(makeSet(allUrls), makeSet(urlsNotRequiringCodeAccess))
 		sortUrls(urlsRequiringCodeAccess)
 		updates[p.name+".AllowCodeAccess"] = urlsRequiringCodeAccess
+
+		if p.name == GitHubProvider {
+			p.config.Inbound.GitHub.AllowCodeAccess = false
+			p.config.Inbound.GitHub.AllowCodeReview = true
+			p.config.Inbound.Allowlist = nil
+			if err := pkg.PopulateAllowLists(p.config); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to populate review allowlist: %v\n", err)
+				os.Exit(1)
+			}
+			reviewURLs, err := extractUrlsFromAllowlist(p.config.Inbound.Allowlist, baseURL)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to extract review URLs: %v\n", err)
+				os.Exit(1)
+			}
+			reviewURLs = subtract(makeSet(reviewURLs), makeSet(urlsNotRequiringCodeAccess))
+			sortUrls(reviewURLs)
+			updates[p.name+".AllowCodeReview"] = reviewURLs
+		}
 	}
 
 	var buf bytes.Buffer

@@ -685,6 +685,50 @@ func TestAllowlistGitHubEditIssueComment(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "POST", comment, false)
 }
 
+func TestAllowlistGitHubPullRequestReviews(t *testing.T) {
+	for _, flags := range []struct{ access, review bool }{
+		{false, false}, {true, false}, {false, true}, {true, true},
+	} {
+		for _, listConfig := range []bool{false, true} {
+			config := &Config{}
+			const baseURL = "https://github.example.com/api/v3"
+			if listConfig {
+				config.Inbound.SCMs = []SCM{{Type: SCMTypeGitHub, BaseURL: baseURL, AllowCodeAccess: flags.access, AllowCodeReview: flags.review}}
+			} else {
+				config.Inbound.GitHub = &GitHub{BaseURL: baseURL, AllowCodeAccess: flags.access, AllowCodeReview: flags.review}
+			}
+			if err := PopulateAllowLists(config); err != nil {
+				t.Fatal(err)
+			}
+			allowlist := &config.Inbound.Allowlist
+			for _, repo := range []string{
+				"https://github.example.com/api/v3/repos/testorg/testrepo",
+				"https://github.example.com/api/v3/repositories/235651",
+			} {
+				for _, tc := range []struct {
+					method string
+					path   string
+					allow  bool
+				}{
+					{"GET", "/reviews", true},
+					{"POST", "/reviews", true},
+					{"PUT", "/reviews/123/dismissals", true},
+					{"PATCH", "/reviews", false},
+					{"DELETE", "/reviews", false},
+					{"GET", "/reviews/123/dismissals", false},
+					{"POST", "/reviews/123/dismissals", false},
+					{"GET", "/reviews/123", false},
+					{"POST", "/reviews/123/events", false},
+					{"PUT", "/reviews/123/dismissals/extra", false},
+				} {
+					assertAllowlistMatch(t, allowlist, tc.method, repo+"/pulls/42"+tc.path, flags.review && tc.allow)
+				}
+				assertAllowlistMatch(t, allowlist, "GET", repo+"/pulls/42", flags.access)
+			}
+		}
+	}
+}
+
 func TestAllowlistGitHubPullRequestReads(t *testing.T) {
 	allowlist := gitHubAllowlist(t, true)
 
