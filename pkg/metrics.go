@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"fmt"
+	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -69,7 +70,7 @@ func StartMetrics(config *Config) error {
 			io.WriteString(w, "OK")
 		} else {
 			w.WriteHeader(503)
-			io.WriteString(w, fmt.Sprintf("Not Ready: no successful heartbeat within %v", heartbeatCutoff))
+			fmt.Fprintf(w, "Not Ready: no successful heartbeat within %s", template.HTMLEscapeString(heartbeatCutoff.String()))
 		}
 	})
 
