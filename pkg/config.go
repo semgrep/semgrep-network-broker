@@ -1667,6 +1667,18 @@ func buildBitBucketAllowlist(scm scmInstance) (Allowlist, error) {
 				Methods:           ParseHttpMethods([]string{"GET"}),
 				SetRequestHeaders: headers,
 			},
+			// common ancestor of two commits (Bitbucket 8.16+)
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/commits/:commit/merge-base").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
+			// raw unified diff between two revisions
+			AllowlistItem{
+				URL:               bitBucketBaseUrl.JoinPath("/projects/:project/repos/:repo/diff").String(),
+				Methods:           ParseHttpMethods([]string{"GET"}),
+				SetRequestHeaders: headers,
+			},
 			// create the branch the fix commits onto. Also the endpoint the
 			// write-permission preflight POSTs to, so that check now reports
 			// "no write access" on a read-only deployment, which is accurate.

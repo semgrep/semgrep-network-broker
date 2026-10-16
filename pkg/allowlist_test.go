@@ -457,6 +457,48 @@ func TestAllowlistBitBucketAutofixWritesRequireCodeAccess(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", repo+"/branches", true)
 }
 
+// Diff-aware scans read the merge base of two commits and the unified diff
+// between them. Both return repository contents, so they are gated behind
+// allowCodeAccess.
+const bitBucketHeadSha = "0123456789abcdef0123456789abcdef01234567"
+const bitBucketBaseSha = "fedcba9876543210fedcba9876543210fedcba98"
+
+func TestAllowlistBitBucketMergeBaseAndDiff(t *testing.T) {
+	allowlist := bitBucketAllowlist(t, true)
+
+	const repo = "https://bitbucket.example.com/rest/api/latest/projects/CAL/repos/problems-on-purpose"
+	// Project and repo keys arrive percent-encoded; the app double-encodes them
+	// when sending through the broker, so cover both layers.
+	const encodedRepo = "https://bitbucket.example.com/rest/api/latest/projects/MY%20PROJ/repos/my%20repo"
+	const doubleEncodedRepo = "https://bitbucket.example.com/rest/api/latest/projects/MY%2520PROJ/repos/my%2520repo"
+
+	for _, r := range []string{repo, encodedRepo, doubleEncodedRepo} {
+		assertAllowlistMatch(t, allowlist, "GET", r+"/commits/"+bitBucketHeadSha+"/merge-base?otherCommitId="+bitBucketBaseSha, true)
+		assertAllowlistMatch(t, allowlist, "GET", r+"/commits/"+bitBucketHeadSha+"/merge-base", true)
+		assertAllowlistMatch(t, allowlist, "GET", r+"/diff?since="+bitBucketBaseSha+"&until="+bitBucketHeadSha, true)
+		assertAllowlistMatch(t, allowlist, "GET", r+"/diff", true)
+	}
+
+	// Negative: read-only.
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/commits/"+bitBucketHeadSha+"/merge-base?otherCommitId="+bitBucketBaseSha, false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/diff?since="+bitBucketBaseSha+"&until="+bitBucketHeadSha, false)
+	// Negative: the commit placeholder is a single path segment.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/commits/"+bitBucketHeadSha+"/extra/merge-base", false)
+	// Negative: per-file diff paths are not covered by the repo-level diff rule.
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/diff/src/main.py", false)
+}
+
+func TestAllowlistBitBucketMergeBaseAndDiffRequireCodeAccess(t *testing.T) {
+	allowlist := bitBucketAllowlist(t, false)
+
+	const repo = "https://bitbucket.example.com/rest/api/latest/projects/CAL/repos/problems-on-purpose"
+
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/commits/"+bitBucketHeadSha+"/merge-base?otherCommitId="+bitBucketBaseSha, false)
+	assertAllowlistMatch(t, allowlist, "GET", repo+"/diff?since="+bitBucketBaseSha+"&until="+bitBucketHeadSha, false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/commits/"+bitBucketHeadSha+"/merge-base", false)
+	assertAllowlistMatch(t, allowlist, "POST", repo+"/diff", false)
+}
+
 func azureDevOpsAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 	t.Helper()
 
