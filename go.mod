@@ -1,6 +1,6 @@
 module github.com/semgrep/semgrep-network-broker
 
-go 1.26.8
+go 1.26.10
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1

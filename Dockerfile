@@ -1,4 +1,4 @@
-FROM golang:1.26.8-alpine@sha256:8ac98ca534ac3f51e1f420a1dd2c15e74c75cfa0f23f3ad27eb5d7236c349a0c AS build
+FROM golang:1.26.10-alpine@sha256:9ce231b28998b32e116927c61aa5c406183061d4f3f2d61b292c88e7f6bdf7ca AS build
 
 ARG BUILDTIME=no-buildtime
 ARG VERSION=local-dev
@@ -18,7 +18,8 @@ RUN go build -o /semgrep-network-broker -ldflags="-X 'github.com/semgrep/semgrep
 FROM alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0
 
 ARG BUILDTIME
-RUN apk upgrade --no-cache && adduser -D semgrep
+# ca-certificates-bundle>=20261020-r0 distrusts emSign ECC Root CA - G3 (eMudhra intermediate key compromise, Oct 2026)
+RUN apk upgrade --no-cache && apk add --no-cache 'ca-certificates-bundle>=20261020-r0' && adduser -D semgrep
 USER semgrep
 WORKDIR /home/semgrep
 
