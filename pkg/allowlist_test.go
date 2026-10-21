@@ -395,6 +395,25 @@ func TestAllowlistGitLabAutofixWritesRequireCodeAccess(t *testing.T) {
 	assertAllowlistMatch(t, allowlist, "GET", project+"/repository/branches", true)
 }
 
+// Workflow dispatch reads a single MR to recover the base SHA that GitLab's
+// webhook payload does not carry. MR metadata is not repository contents, so
+// the read works with and without allowCodeAccess.
+func TestAllowlistGitLabSingleMergeRequestRead(t *testing.T) {
+	const project = "https://gitlab.example.com/api/v4/projects/caleb-testing%2Fproblems"
+
+	for _, allowCodeAccess := range []bool{false, true} {
+		allowlist := gitLabAllowlist(t, allowCodeAccess)
+
+		assertAllowlistMatch(t, allowlist, "GET", project+"/merge_requests/456", true)
+		// A numeric project id is the other form the platform sends.
+		assertAllowlistMatch(t, allowlist, "GET", "https://gitlab.example.com/api/v4/projects/123/merge_requests/456", true)
+
+		// Negative: the entry allows reads only.
+		assertAllowlistMatch(t, allowlist, "PUT", project+"/merge_requests/456", false)
+		assertAllowlistMatch(t, allowlist, "DELETE", project+"/merge_requests/456", false)
+	}
+}
+
 func bitBucketAllowlist(t *testing.T, allowCodeAccess bool) *Allowlist {
 	t.Helper()
 
