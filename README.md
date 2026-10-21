@@ -365,6 +365,7 @@ Adding a `gitlab` field to the config implicitly adds these endpoints to the all
 - GET `https://gitlab.example.com/api/v4/projects/:project`
 - GET `https://gitlab.example.com/api/v4/projects/:project/members/all/:user`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests`
+- GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/discussions/:discussion/notes/:note/award_emoji`
 - GET `https://gitlab.example.com/api/v4/projects/:project/merge_requests/:number/versions`

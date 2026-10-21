@@ -1380,6 +1380,12 @@ func buildGitLabAllowlist(scm scmInstance) (Allowlist, error) {
 			Methods:           ParseHttpMethods([]string{"GET"}),
 			SetRequestHeaders: headers,
 		},
+		// Get a single MR (branches, diff_refs SHAs)
+		AllowlistItem{
+			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number").String(),
+			Methods:           ParseHttpMethods([]string{"GET"}),
+			SetRequestHeaders: headers,
+		},
 		// MR versions
 		AllowlistItem{
 			URL:               gitLabBaseUrl.JoinPath("/projects/:project/merge_requests/:number/versions").String(),
