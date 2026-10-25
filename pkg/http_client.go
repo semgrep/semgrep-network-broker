@@ -51,8 +51,7 @@ func (hcc *HttpClientConfig) BuildRoundTripper() (http.RoundTripper, error) {
 	switch hcc.TlsMinVersion {
 	case "1.2":
 		minVersion = uint16(tls.VersionTLS12)
-	case "1.3":
-	case "":
+	case "1.3", "":
 		minVersion = uint16(tls.VersionTLS13)
 	default:
 		return nil, fmt.Errorf("invalid tlsMinVersion: %q. tlsMinVersion must be '1.2' or '1.3' — older TLS versions are not supported", hcc.TlsMinVersion)
